@@ -1,0 +1,96 @@
+import { PrismaClient } from '@prisma/client';
+import { getSession } from '@/lib/auth';
+
+const prisma = new PrismaClient();
+
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    
+    let whereClause: any = {};
+    if (startDate && endDate) {
+      whereClause.createdAt = {
+        gte: new Date(startDate),
+        lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+
+    const returns = await prisma.return.findMany({
+      where: whereClause,
+      include: {
+        items: { include: { product: { select: { name: true, sku: true } } } },
+        supplier: { select: { name: true } },
+        user: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    return Response.json({ success: true, returns });
+  } catch (error: any) {
+    return Response.json({ success: false, message: error?.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await getSession();
+    const { items, supplierId, notes, createdAt } = await req.json();
+
+    if (!items || items.length === 0) {
+      return Response.json({ success: false, message: "Daftar retur kosong" }, { status: 400 });
+    }
+
+    let userId = session?.id as string | undefined;
+
+    if (!userId) {
+      const fallbackUser = await prisma.user.findFirst();
+      if (!fallbackUser) return Response.json({ success: false, message: "User tidak ditemukan." }, { status: 400 });
+      userId = fallbackUser.id;
+    }
+
+    const returnItemsData = items.map((item: any) => ({
+      productId: item.productId,
+      productName: item.productName || item.product?.name || "Barang Retur",
+      quantity: item.quantity,
+      reason: item.reason
+    }));
+
+    // Prisma Transaction untuk Create Return & Decrement Stock
+    const newReturn = await prisma.$transaction(async (tx) => {
+      // 1. Buat data retur
+      const returnDoc = await tx.return.create({
+        data: {
+          userId: userId!,
+          supplierId: supplierId || null,
+          notes: notes,
+          createdAt: createdAt ? new Date(createdAt) : new Date(),
+          items: {
+            create: returnItemsData
+          }
+        },
+        include: {
+          items: true
+        }
+      });
+
+      // 2. Kurangi stok produk
+      for (const item of items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: { decrement: item.quantity }
+          }
+        });
+      }
+
+      return returnDoc;
+    });
+
+    return Response.json({ success: true, return: newReturn });
+  } catch (error: any) {
+    console.error('[Return Error]', error);
+    return Response.json({ success: false, message: error?.message || "Gagal menyimpan retur" }, { status: 500 });
+  }
+}

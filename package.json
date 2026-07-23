@@ -1,0 +1,29 @@
+{
+  "name": "pos2-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "html5-qrcode": "^2.3.8",
+    "jose": "^6.2.4",
+    "next": "14.2.3",
+    "react": "^18",
+    "react-dom": "^18",
+    "sweetalert2": "^11.26.25"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.3",
+    "prisma": "^5.14.0",
+    "typescript": "^5"
+  }
+}
