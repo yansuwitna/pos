@@ -23,7 +23,8 @@ const roleLabels: Record<string, { label: string; color: string; bg: string }> =
   WAREHOUSE: { label: '📦 Operator Gudang', color: '#065f46', bg: '#d1fae5' },
 };
 
-const emptyForm = { username: '', password: '', name: '', role: 'CASHIER' as const };
+type UserForm = { username: '', password: '', name: '', role: 'ADMIN' | 'CASHIER' | 'WAREHOUSE' };
+const emptyForm = { username: '', password: '', name: '', role: 'CASHIER' as 'ADMIN' | 'CASHIER' | 'WAREHOUSE' };
 
 export default function UsersPage() {
   const [users, setUsers]     = useState<User[]>([]);
