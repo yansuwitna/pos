@@ -2,11 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
+import ProductSearch from '@/app/components/ProductSearch';
 
 type Product = {
   id: string;
   sku: string | null;
   name: string;
+  price: number;
+  cost: number;
   stock: number;
 };
 
@@ -23,7 +26,6 @@ export default function PurchasePage() {
   
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]); // Default today
-  const [search, setSearch] = useState('');
   const [printData, setPrintData] = useState<any | null>(null);
   
   const [cart, setCart] = useState<PurchaseItem[]>([]);
@@ -79,7 +81,7 @@ export default function PurchasePage() {
       }, false);
       scanner.render(
         (decodedText) => {
-          handleSearch(decodedText);
+          handleScan(decodedText);
           scanner.clear();
           setScanning(false);
         },
@@ -96,7 +98,7 @@ export default function PurchasePage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === 'Enter') {
-        if (barcodeBuffer.length > 3) handleSearch(barcodeBuffer);
+        if (barcodeBuffer.length > 3) handleScan(barcodeBuffer);
         barcodeBuffer = '';
       } else if (e.key.length === 1) {
         barcodeBuffer += e.key;
@@ -108,11 +110,10 @@ export default function PurchasePage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [scannerMode, products]);
 
-  const handleSearch = (query: string) => {
+  const handleScan = (query: string) => {
     const p = products.find(x => x.sku === query || x.name.toLowerCase() === query.toLowerCase());
     if (p) {
       addToCart(p);
-      setSearch('');
     } else {
       Swal.fire('Pencarian', `Produk "${query}" tidak ditemukan.`, 'info');
     }
@@ -231,7 +232,7 @@ export default function PurchasePage() {
       </div>
 
       {showForm && (
-        <div className="card">
+        <div className="card" style={{ position: 'relative', zIndex: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 className="card-title" style={{ marginBottom: 0 }}>📥 Form Input Pembelian</h2>
             <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setShowForm(false)}>Tutup</button>
@@ -270,10 +271,7 @@ export default function PurchasePage() {
             
             <div className="form-group" style={{ marginTop: '1rem', marginBottom: 0 }}>
               <label>Cari Manual (Nama / SKU)</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Ketik lalu Enter..." onKeyDown={e => e.key === 'Enter' && handleSearch(search)} style={{ marginBottom: 0 }} />
-                <button className="btn btn-outline" onClick={() => handleSearch(search)}>Cari</button>
-              </div>
+              <ProductSearch products={products} onSelect={addToCart} />
             </div>
           </div>
 

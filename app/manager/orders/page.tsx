@@ -2,11 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
+import ProductSearch from '@/app/components/ProductSearch';
 
 type Product = {
   id: string;
   sku: string | null;
   name: string;
+  price: number;
+  cost: number;
   stock: number;
 };
 
@@ -23,7 +26,6 @@ export default function OrderPage() {
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
-  const [search, setSearch] = useState('');
   const [cart, setCart] = useState<OrderItem[]>([]);
   
   const [scanning, setScanning] = useState(false);
@@ -84,7 +86,7 @@ export default function OrderPage() {
       }, false);
       scanner.render(
         (decodedText) => {
-          handleSearch(decodedText);
+          handleScan(decodedText);
           scanner.clear();
           setScanning(false);
         },
@@ -101,7 +103,7 @@ export default function OrderPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === 'Enter') {
-        if (barcodeBuffer.length > 3) handleSearch(barcodeBuffer);
+        if (barcodeBuffer.length > 3) handleScan(barcodeBuffer);
         barcodeBuffer = '';
       } else if (e.key.length === 1) {
         barcodeBuffer += e.key;
@@ -113,11 +115,10 @@ export default function OrderPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [scannerMode, products]);
 
-  const handleSearch = (query: string) => {
+  const handleScan = (query: string) => {
     const p = products.find(x => x.sku === query || x.name.toLowerCase() === query.toLowerCase());
     if (p) {
       addToCart(p);
-      setSearch('');
     } else {
       Swal.fire('Pencarian', `Produk "${query}" tidak ditemukan.`, 'info');
     }
@@ -350,7 +351,7 @@ export default function OrderPage() {
 
       {showForm && (
         <div className="grid-2">
-          <div className="card">
+          <div className="card" style={{ position: 'relative', zIndex: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 className="card-title" style={{ marginBottom: 0 }}>
                 {editOrder ? '✏️ Edit Pesanan (PO)' : '🔙 Form Pemesanan Baru'}
@@ -398,10 +399,11 @@ export default function OrderPage() {
             
             <div className="form-group" style={{ marginBottom: '2rem' }}>
               <label>Cari Manual (Ketik Nama / SKU)</label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Ketik lalu Enter..." onKeyDown={e => e.key === 'Enter' && handleSearch(search)} style={{ marginBottom: 0, flex: '1 1 200px' }} />
-                <button className="btn btn-outline" onClick={() => handleSearch(search)}>Cari</button>
-                <button className="btn" style={{ background: '#10b981', color: 'white' }} onClick={() => setShowNewItemModal(true)}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <ProductSearch products={products} onSelect={addToCart} />
+                </div>
+                <button className="btn" style={{ background: '#10b981', color: 'white', flex: '0 0 auto' }} onClick={() => setShowNewItemModal(true)}>
                   ➕ Pesan Barang Baru (Belum ada di data)
                 </button>
               </div>

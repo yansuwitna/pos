@@ -2,11 +2,14 @@
 import { useState, useEffect } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
+import ProductSearch from '@/app/components/ProductSearch';
 
 type Product = {
   id: string;
   sku: string | null;
   name: string;
+  price: number;
+  cost: number;
   stock: number;
 };
 
@@ -24,7 +27,6 @@ export default function ReturnPage() {
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
-  const [search, setSearch] = useState('');
   const [cart, setCart] = useState<ReturnItem[]>([]);
   
   const [scanning, setScanning] = useState(false);
@@ -80,7 +82,7 @@ export default function ReturnPage() {
       }, false);
       scanner.render(
         (decodedText) => {
-          handleSearch(decodedText);
+          handleScan(decodedText);
           scanner.clear();
           setScanning(false);
         },
@@ -97,7 +99,7 @@ export default function ReturnPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === 'Enter') {
-        if (barcodeBuffer.length > 3) handleSearch(barcodeBuffer);
+        if (barcodeBuffer.length > 3) handleScan(barcodeBuffer);
         barcodeBuffer = '';
       } else if (e.key.length === 1) {
         barcodeBuffer += e.key;
@@ -109,11 +111,10 @@ export default function ReturnPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [scannerMode, products]);
 
-  const handleSearch = (query: string) => {
+  const handleScan = (query: string) => {
     const p = products.find(x => x.sku === query || x.name.toLowerCase() === query.toLowerCase());
     if (p) {
       addToCart(p);
-      setSearch('');
     } else {
       Swal.fire('Pencarian', `Produk "${query}" tidak ditemukan.`, 'info');
     }
@@ -309,7 +310,7 @@ export default function ReturnPage() {
 
       {showForm && (
         <div className="grid-2">
-          <div className="card">
+          <div className="card" style={{ position: 'relative', zIndex: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 className="card-title" style={{ marginBottom: 0 }}>🔙 Form Input Retur</h2>
               <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setShowForm(false)}>Tutup</button>
@@ -355,10 +356,7 @@ export default function ReturnPage() {
             
             <div className="form-group" style={{ marginBottom: '2rem' }}>
               <label>Cari Manual (Ketik Nama / SKU)</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Ketik lalu Enter..." onKeyDown={e => e.key === 'Enter' && handleSearch(search)} style={{ marginBottom: 0 }} />
-                <button className="btn btn-outline" onClick={() => handleSearch(search)}>Cari</button>
-              </div>
+              <ProductSearch products={products} onSelect={addToCart} />
             </div>
 
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Diretur:</h3>

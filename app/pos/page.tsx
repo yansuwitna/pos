@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
+import ProductSearch from '@/app/components/ProductSearch';
 
 type Product = {
   id: string;
@@ -15,7 +16,6 @@ type CartItem = Product & { quantity: number; subtotal: number };
 export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState('');
   const [scanning, setScanning] = useState(false);
   const [total, setTotal] = useState(0);
   const [payment, setPayment] = useState('');
@@ -142,18 +142,6 @@ export default function POSPage() {
     }
   };
 
-  const handleManualSearch = () => {
-    if (!search) return;
-    const query = search.toLowerCase();
-    const product = products.find(p => p.sku === query || p.name.toLowerCase().includes(query));
-    if (product) {
-      addToCart(product);
-      setSearch('');
-    } else {
-      Swal.fire('Tidak Ditemukan', "Barang tidak ditemukan!", 'error');
-    }
-  };
-
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -248,7 +236,7 @@ export default function POSPage() {
         </a>
       </div>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div className="card" style={{ marginBottom: '1.5rem', position: 'relative', zIndex: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📷 Scan & Cari Barang</h2>
           {scannerMode === 'camera' ? (
@@ -283,17 +271,7 @@ export default function POSPage() {
 
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Pencarian Manual (Ketik Nama / SKU)</label>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input 
-              type="text" 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-              placeholder="Ketik lalu Enter..." 
-              onKeyDown={e => e.key === 'Enter' && handleManualSearch()} 
-              style={{ marginBottom: 0 }} 
-            />
-            <button className="btn btn-outline" onClick={handleManualSearch}>Cari</button>
-          </div>
+          <ProductSearch products={products} onSelect={addToCart} />
         </div>
       </div>
 

@@ -85,7 +85,7 @@ export default function DashboardClient({ role, name }: Props) {
                   <tbody>
                     {transactions.map((trx, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '0.5rem' }}>{new Date(trx.createdAt).toLocaleTimeString('id-ID')}</td>
+                        <td style={{ padding: '0.5rem' }}>{new Date(trx.createdAt).toLocaleString('id-ID')}</td>
                         <td style={{ textAlign: 'right', padding: '0.5rem', fontWeight: 600 }}>Rp {trx.total.toLocaleString('id-ID')}</td>
                         <td style={{ textAlign: 'center', padding: '0.5rem' }}>
                           <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => viewReceipt(trx)}>
