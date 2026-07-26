@@ -85,7 +85,7 @@ export default function ManagerPage() {
           
           await scanner.start(
             selectedCamera ? { deviceId: { exact: selectedCamera } } : { facingMode: 'environment' },
-            { fps: 15, qrbox: { width: 300, height: 100 } },
+            { fps: 15, qrbox: (vw, vh) => ({ width: Math.min(vw * 0.8, 300), height: 100 }) },
             (decodedText) => {
               if (editProduct) setEditProduct(prev => prev ? { ...prev, sku: decodedText } : prev);
               else setForm(prev => ({ ...prev, sku: decodedText }));

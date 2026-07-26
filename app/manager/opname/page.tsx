@@ -95,7 +95,7 @@ export default function OpnamePage() {
           
           await scanner.start(
             selectedCamera ? { deviceId: { exact: selectedCamera } } : { facingMode: 'environment' },
-            { fps: 10, qrbox: { width: 300, height: 100 } },
+            { fps: 10, qrbox: (vw, vh) => ({ width: Math.min(vw * 0.8, 300), height: 100 }) },
             (decodedText) => {
               handleSearch(decodedText);
               // Hentikan otomatis setelah berhasil scan

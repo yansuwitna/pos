@@ -81,7 +81,7 @@ export default function OrderPage() {
     setTimeout(() => {
       const scanner = new Html5QrcodeScanner("sku-reader-order", { 
         fps: 15,
-        qrbox: { width: 400, height: 120 },
+        qrbox: (vw, vh) => ({ width: Math.min(vw * 0.8, 400), height: 120 }),
         formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128],
         videoConstraints: selectedCamera 
           ? { deviceId: { exact: selectedCamera }, facingMode: 'environment' } 
