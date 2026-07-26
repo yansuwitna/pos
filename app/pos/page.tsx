@@ -4,7 +4,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
 import ProductSearch from '@/app/components/ProductSearch';
 
-type Product = { id: string; sku: string | null; name: string; price: number; discountPercent?: number; };
+type Product = { id: string; sku: string | null; name: string; price: number; discountPercent?: number; cost: number; stock: number; };
 type DiscountRule = { id: string; name: string; minItemQuantity: number | null; minTransaction: number | null; discountPercent: number; isActive: boolean; };
 type Customer = { id: string; name: string; phone: string | null; };
 type CartItem = Product & { quantity: number; subtotal: number };
@@ -357,10 +357,10 @@ export default function POSPage() {
              <span>Subtotal</span>
              <span>Rp {total.toLocaleString('id-ID')}</span>
           </div>
-          {discount > 0 && (
+          {Number(discount) > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#ef4444' }}>
                <span>Diskon</span>
-               <span>- Rp {discount.toLocaleString('id-ID')}</span>
+               <span>- Rp {Number(discount).toLocaleString('id-ID')}</span>
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: '#b91c1c' }}>
@@ -594,7 +594,7 @@ export default function POSPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end', fontWeight: 'bold', fontSize: '14px' }}>
              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                <span>Diskon:</span>
-               <span style={{ width: '120px', textAlign: 'right', paddingRight: '6px', color: '#ef4444' }}>{discount > 0 ? `- ${discount.toLocaleString('id-ID')}` : '0'}</span>
+               <span style={{ width: '120px', textAlign: 'right', paddingRight: '6px', color: '#ef4444' }}>{Number(discount) > 0 ? `- ${Number(discount).toLocaleString('id-ID')}` : '0'}</span>
              </div>
              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                <span>PAJAK:</span>
