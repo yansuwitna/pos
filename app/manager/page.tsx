@@ -11,6 +11,7 @@ type Product = {
   price: number;
   cost: number;
   stock: number;
+  discountPercent?: number;
   category?: { name: string };
   _count?: {
     transactionItems: number;
@@ -22,7 +23,7 @@ type Product = {
 
 export default function ManagerPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [form, setForm] = useState<Product>({ sku: '', name: '', type: 'GOODS', price: 0, cost: 0, stock: 0 });
+  const [form, setForm] = useState<Product>({ sku: '', name: '', type: 'GOODS', price: 0, cost: 0, stock: 0, discountPercent: 0 });
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [search, setSearch] = useState('');
   const [scanning, setScanning] = useState(false);
@@ -97,13 +98,13 @@ export default function ManagerPage() {
     const res = await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, price: Number(form.price), cost: Number(form.cost), stock: 0 })
+      body: JSON.stringify({ ...form, price: Number(form.price), cost: Number(form.cost), stock: 0, discountPercent: Number(form.discountPercent) || 0 })
     });
     const data = await res.json();
     setLoading(false);
     if (data.success) {
       Swal.fire('Berhasil!', "Barang berhasil ditambahkan!", 'success');
-      setForm({ sku: '', name: '', type: 'GOODS', price: 0, cost: 0, stock: 0 });
+      setForm({ sku: '', name: '', type: 'GOODS', price: 0, cost: 0, stock: 0, discountPercent: 0 });
       setShowForm(false);
       fetchProducts();
     } else {
@@ -181,16 +182,17 @@ export default function ManagerPage() {
                 <th>Nama</th>
                 <th>Tipe</th>
                 <th>Kategori</th>
-                <th>Harga Beli</th>
+                <th>Harga Modal</th>
                 <th>Harga Jual</th>
-                <th>Stok</th>
+                <th>Diskon (%)</th>
+                <th>Sisa Stok</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {tableLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>
                     <div className="spinner"></div> Memuat data...
                   </td>
                 </tr>
@@ -205,6 +207,7 @@ export default function ManagerPage() {
                     <td>{p.category?.name || '-'}</td>
                     <td>Rp {p.cost.toLocaleString('id-ID')}</td>
                     <td>Rp {p.price.toLocaleString('id-ID')}</td>
+                    <td style={{ color: p.discountPercent && p.discountPercent > 0 ? '#b91c1c' : 'inherit' }}>{p.discountPercent || 0}%</td>
                     <td style={{ fontWeight: 600, color: p.stock < 5 ? '#ef4444' : 'inherit' }}>{p.type === 'GOODS' ? p.stock : '-'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -270,6 +273,10 @@ export default function ManagerPage() {
                   <input type="number" min="0" value={editProduct.price} onChange={e => setEditProduct({...editProduct, price: parseInt(e.target.value) || 0})} required />
                 </div>
               </div>
+              <div className="form-group">
+                <label>Diskon (%)</label>
+                <input type="number" min="0" max="100" value={editProduct.discountPercent || 0} onChange={e => setEditProduct({...editProduct, discountPercent: parseInt(e.target.value) || 0})} />
+              </div>
               <button type="submit" className="btn w-full" disabled={loading}>{loading ? 'Menyimpan...' : '💾 Simpan Perubahan'}</button>
             </form>
           ) : (
@@ -308,6 +315,10 @@ export default function ManagerPage() {
                   <label>Harga Jual</label>
                   <input type="number" min="0" value={form.price} onChange={e => setForm({...form, price: parseInt(e.target.value) || 0})} required />
                 </div>
+              </div>
+              <div className="form-group">
+                <label>Diskon (%)</label>
+                <input type="number" min="0" max="100" value={form.discountPercent || 0} onChange={e => setForm({...form, discountPercent: parseInt(e.target.value) || 0})} />
               </div>
               <button type="submit" className="btn w-full" disabled={loading}>{loading ? 'Menyimpan...' : '➕ Tambah Barang/Jasa'}</button>
             </form>

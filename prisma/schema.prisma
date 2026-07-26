@@ -36,6 +36,7 @@ model User {
   debtPayments       DebtPayment[]
   expenses           Expense[]
   stockOpnames       StockOpname[]
+  capitals           Capital[]
 }
 
 model Category {
@@ -47,17 +48,18 @@ model Category {
 }
 
 model Product {
-  id          String    @id @default(cuid())
-  sku         String?   @unique
-  name        String
-  type        ItemType  @default(GOODS)
-  price       Float
-  cost        Float
-  stock       Int       @default(0)
-  categoryId  String?
-  category    Category? @relation(fields: [categoryId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  sku             String?   @unique
+  name            String
+  type            ItemType  @default(GOODS)
+  price           Float
+  cost            Float
+  stock           Int       @default(0)
+  discountPercent Float     @default(0)
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   transactionItems TransactionItem[]
   purchaseItems    PurchaseItem[]
@@ -273,4 +275,13 @@ model DiscountRule {
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model Capital {
+  id          String   @id @default(cuid())
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
 }

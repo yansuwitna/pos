@@ -42,12 +42,18 @@ export default function DashboardClient({ role, name }: Props) {
   }, [role]);
 
   const viewReceipt = (trx: any) => {
-    const items = trx.items.map((i: any) => ({
-      name: i.productName || i.product?.name || 'Produk Dihapus',
-      quantity: i.quantity,
-      price: i.price,
-      subtotal: i.subtotal
-    }));
+    const items = trx.items.map((i: any) => {
+      const oldTotal = i.price * i.quantity;
+      const hasDiscount = i.subtotal < oldTotal;
+      const discountPercent = hasDiscount ? Math.round(((oldTotal - i.subtotal) / oldTotal) * 100) : 0;
+      return {
+        name: i.productName || i.product?.name || 'Produk Dihapus',
+        quantity: i.quantity,
+        price: i.price,
+        subtotal: i.subtotal,
+        discountPercent
+      };
+    });
 
     setReceiptData({
       items,
@@ -178,6 +184,11 @@ export default function DashboardClient({ role, name }: Props) {
             <h2 style={{ fontSize: '1.25rem' }}>Laporan Penjualan</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pantau transaksi dan pendapatan.</p>
           </a>
+          <a href="/manager/capital" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💰</div>
+            <h2 style={{ fontSize: '1.25rem' }}>Modal Usaha</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Suntikan dana dan modal awal toko.</p>
+          </a>
           <a href="/manager/finances" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💼</div>
             <h2 style={{ fontSize: '1.25rem' }}>Hutang & Piutang</h2>
@@ -243,10 +254,23 @@ export default function DashboardClient({ role, name }: Props) {
                 {receiptData.items.map((item: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: '0.5rem' }}>
                     <div>{item.name}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
-                      <span>Rp {item.subtotal.toLocaleString('id-ID')}</span>
-                    </div>
+                    {item.discountPercent > 0 ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', textDecoration: 'line-through' }}>
+                          <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
+                          <span>Rp {(item.quantity * item.price).toLocaleString('id-ID')}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Disc {item.discountPercent}%</span>
+                          <span>Rp {item.subtotal.toLocaleString('id-ID')}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
+                        <span>Rp {item.subtotal.toLocaleString('id-ID')}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

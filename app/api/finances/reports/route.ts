@@ -52,11 +52,19 @@ export async function GET(req: Request) {
     // --- NERACA (Semua waktu, tidak peduli startDate/endDate) ---
     
     // A. Kas di Tangan
-    // Kas Masuk = Pembayaran Tunai Transaksi + Pembayaran Cicilan Piutang
+    // Kas Masuk = Modal Awal + Pembayaran Tunai Transaksi + Pembayaran Cicilan Piutang
+    const allCapitals = await prisma.capital.findMany();
     const allTransactions = await prisma.transaction.findMany();
     const allReceivablePayments = await prisma.receivablePayment.findMany();
     let totalKasMasuk = 0;
-    allTransactions.forEach(t => totalKasMasuk += t.amountPaid);
+    
+    // Tambahkan semua Suntikan Modal
+    allCapitals.forEach(c => totalKasMasuk += c.amount);
+
+    allTransactions.forEach(t => {
+      // Kas nyata yang masuk adalah jumlah uang yang dibayar dikurangi kembalian
+      totalKasMasuk += (t.payment - t.change);
+    });
     allReceivablePayments.forEach(p => totalKasMasuk += p.amount);
 
     // Kas Keluar = Pembayaran Tunai Pembelian + Pembayaran Cicilan Hutang + Semua Pengeluaran
@@ -65,7 +73,14 @@ export async function GET(req: Request) {
     const allExpenses = await prisma.expense.findMany();
     
     let totalKasKeluar = 0;
-    allPurchases.forEach(p => totalKasKeluar += p.amountPaid);
+    allPurchases.forEach(p => {
+      // Fallback ke totalCost jika amountPaid 0 tapi statusnya PAID (untuk data lama)
+      if (p.amountPaid > 0) {
+        totalKasKeluar += p.amountPaid;
+      } else if (p.paymentStatus === 'PAID') {
+        totalKasKeluar += p.totalCost;
+      }
+    });
     allDebtPayments.forEach(p => totalKasKeluar += p.amount);
     allExpenses.forEach(e => totalKasKeluar += e.amount);
 
@@ -74,7 +89,9 @@ export async function GET(req: Request) {
     // B. Piutang Usaha
     let totalPiutang = 0;
     allTransactions.forEach(t => {
-      totalPiutang += (t.grandTotal - t.amountPaid);
+      // Pastikan amountPaid tidak melebihi grandTotal (untuk menghindari piutang negatif pada data lama)
+      const validAmountPaid = Math.min(t.grandTotal, t.amountPaid);
+      totalPiutang += (t.grandTotal - validAmountPaid);
     });
 
     // C. Persediaan Barang (Inventory Value)

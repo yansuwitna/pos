@@ -86,7 +86,7 @@ export async function POST(req: Request) {
         payment: payment,
         change: payment > grandTotal ? payment - grandTotal : 0,
         paymentStatus: paymentStatus as any,
-        amountPaid: payment,
+        amountPaid: payment > grandTotal ? grandTotal : payment,
         dueDate: (payment < grandTotal && dueDate) ? new Date(dueDate) : null,
         items: {
           create: transactionItemsData

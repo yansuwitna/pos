@@ -23,6 +23,7 @@ const roleNavLinks: Record<string, { href: string; label: string }[]> = {
     { href: '/manager/expenses', label: '💸 Biaya Operasional' },
     { href: '/manager/finances', label: '💼 Hutang / Piutang' },
     { href: '/manager/reports', label: '📈 Laporan Keuangan' },
+    { href: '/manager/capital', label: '💰 Modal Usaha' },
     { href: '/manager/discount-rules', label: '🎟️ Aturan Diskon' },
     { href: '/customers', label: '👥 Daftar Pelanggan' },
     { href: '/users',     label: '👥 Manajemen User' },

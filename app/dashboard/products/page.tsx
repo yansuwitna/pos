@@ -9,6 +9,7 @@ type Product = {
   price: number;
   cost: number;
   stock: number;
+  discountPercent?: number;
 };
 
 export default function AdminProductsPage() {
@@ -52,6 +53,7 @@ export default function AdminProductsPage() {
               <th>Nama</th>
               <th>Harga Modal</th>
               <th>Harga Jual</th>
+              <th>Diskon (%)</th>
               <th>Sisa Stok</th>
             </tr>
           </thead>
@@ -62,6 +64,7 @@ export default function AdminProductsPage() {
                 <td style={{ fontWeight: 600 }}>{p.name}</td>
                 <td>Rp {p.cost.toLocaleString('id-ID')}</td>
                 <td>Rp {p.price.toLocaleString('id-ID')}</td>
+                <td style={{ color: p.discountPercent && p.discountPercent > 0 ? '#b91c1c' : 'inherit' }}>{p.discountPercent || 0}%</td>
                 <td style={{ fontWeight: 600, color: p.stock < 5 ? '#ef4444' : 'inherit' }}>
                   {p.type === 'GOODS' ? p.stock : '-'}
                 </td>

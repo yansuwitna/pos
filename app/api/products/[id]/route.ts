@@ -13,6 +13,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (updateData.price !== undefined) updateData.price = Number(updateData.price);
     if (updateData.cost !== undefined) updateData.cost = Number(updateData.cost);
     if (updateData.stock !== undefined) updateData.stock = Number(updateData.stock);
+    if (updateData.discountPercent !== undefined) updateData.discountPercent = Number(updateData.discountPercent);
 
     const product = await prisma.product.update({
       where: { id: params.id },
