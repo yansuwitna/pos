@@ -34,6 +34,7 @@ export async function POST(req: Request) {
       
       await tx.receivablePayment.deleteMany();
       await tx.debtPayment.deleteMany();
+      await tx.capital.deleteMany();
 
       // 3. Hapus data master
       await tx.product.deleteMany();

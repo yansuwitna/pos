@@ -25,6 +25,7 @@ export async function GET() {
       stockOpnames: await prisma.stockOpname.findMany(),
       stockOpnameItems: await prisma.stockOpnameItem.findMany(),
       discountRules: await prisma.discountRule.findMany(),
+      capitals: await prisma.capital.findMany(),
     };
 
     return Response.json({ success: true, data });
@@ -73,6 +74,7 @@ export async function POST(req: Request) {
       await tx.supplier.deleteMany();
       await tx.customer.deleteMany();
       await tx.discountRule.deleteMany();
+      await tx.capital.deleteMany();
       await tx.user.deleteMany();
 
       // 2. INSERT BACKUP DATA
@@ -103,6 +105,7 @@ export async function POST(req: Request) {
       if (backupData.expenses?.length > 0) await tx.expense.createMany({ data: backupData.expenses });
       
       if (backupData.discountRules?.length > 0) await tx.discountRule.createMany({ data: backupData.discountRules });
+      if (backupData.capitals?.length > 0) await tx.capital.createMany({ data: backupData.capitals });
     }, {
       maxWait: 10000,
       timeout: 30000 // Berikan waktu yang cukup panjang untuk restore data besar
