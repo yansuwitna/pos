@@ -35,7 +35,7 @@ export default function PurchasePage() {
   
   const [scanning, setScanning] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
-  const [scannerMode, setScannerMode] = useState('camera');
+  const [scannerMode, setScannerMode] = useState('');
   const [scannerObj, setScannerObj] = useState<Html5Qrcode | null>(null);
   
   const [loading, setLoading] = useState(false);
@@ -50,8 +50,8 @@ export default function PurchasePage() {
     const savedCam = localStorage.getItem('pos_camera_id');
     if (savedCam) setSelectedCamera(savedCam);
     
-    const mode = localStorage.getItem('pos_scanner_mode');
-    if (mode) setScannerMode(mode);
+    const mode = localStorage.getItem('pos_scanner_mode') || 'camera';
+    setScannerMode(mode);
   }, []);
 
   const fetchSuppliers = async () => {

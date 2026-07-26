@@ -30,7 +30,7 @@ export default function OpnamePage() {
   const [loading, setLoading] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
-  const [scannerMode, setScannerMode] = useState<string>('camera');
+  const [scannerMode, setScannerMode] = useState<string>('');
 
   // Form State
   const [notes, setNotes] = useState('');

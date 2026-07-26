@@ -65,7 +65,7 @@ export default function POSPage() {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [storeInfo, setStoreInfo] = useState({ name: 'POS Pro', address: '', phone: '', greeting: 'Terima Kasih', logo: '' });
   const [selectedCamera, setSelectedCamera] = useState<string>('');
-  const [scannerMode, setScannerMode] = useState('camera');
+  const [scannerMode, setScannerMode] = useState('');
   const [scannerObj, setScannerObj] = useState<Html5Qrcode | null>(null);
   const [printerType, setPrinterType] = useState('kabel');
   const [isMobile, setIsMobile] = useState(false);
@@ -85,7 +85,8 @@ export default function POSPage() {
     
     if (localStorage.getItem('pos_camera_id')) setSelectedCamera(localStorage.getItem('pos_camera_id')!);
     if (localStorage.getItem('pos_store_info')) try { setStoreInfo(JSON.parse(localStorage.getItem('pos_store_info')!)); } catch(e){}
-    if (localStorage.getItem('pos_scanner_mode')) setScannerMode(localStorage.getItem('pos_scanner_mode')!);
+    const mode = localStorage.getItem('pos_scanner_mode') || 'camera';
+    setScannerMode(mode);
     if (localStorage.getItem('pos_printer_type')) setPrinterType(localStorage.getItem('pos_printer_type')!);
   }, []);
 
