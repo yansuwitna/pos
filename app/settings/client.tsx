@@ -24,8 +24,10 @@ export default function SettingsClient({ role }: Props) {
   
   const [scannerMode, setScannerMode] = useState('camera'); // 'camera' or 'physical'
 
+  const [printerType, setPrinterType] = useState('kabel'); // 'kabel' or 'bluetooth'
+
   useEffect(() => {
-    if (!isAdmin) return;
+    // Camera API
     Html5Qrcode.getCameras()
       .then(devs => {
         if (devs?.length) {
@@ -36,14 +38,22 @@ export default function SettingsClient({ role }: Props) {
       })
       .catch(() => {});
       
-    const savedStore = localStorage.getItem('pos_store_info');
-    if (savedStore) {
-      try { setStoreInfo(JSON.parse(savedStore)); } catch(e){}
-    }
-    
     const savedScannerMode = localStorage.getItem('pos_scanner_mode');
     if (savedScannerMode) {
       setScannerMode(savedScannerMode);
+    }
+
+    const savedPrinterType = localStorage.getItem('pos_printer_type');
+    if (savedPrinterType) {
+      setPrinterType(savedPrinterType);
+    }
+
+    if (!isAdmin) return;
+    
+    // Store Info is Admin Only
+    const savedStore = localStorage.getItem('pos_store_info');
+    if (savedStore) {
+      try { setStoreInfo(JSON.parse(savedStore)); } catch(e){}
     }
   }, [isAdmin]);
 
@@ -62,6 +72,11 @@ export default function SettingsClient({ role }: Props) {
   const saveScannerMode = (mode: string) => {
     setScannerMode(mode);
     localStorage.setItem('pos_scanner_mode', mode);
+  };
+
+  const savePrinterType = (type: string) => {
+    setPrinterType(type);
+    localStorage.setItem('pos_printer_type', type);
   };
 
   const handleResetDB = async () => {
@@ -180,74 +195,89 @@ export default function SettingsClient({ role }: Props) {
         </div>
       )}
 
-      {/* === SCANNER MODE (Hanya Admin) === */}
-      {isAdmin ? (
+      {/* === SCANNER MODE (Hanya Kasir & Gudang) === */}
+      {!isAdmin && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <h2 className="card-title">🔍 Mode Alat Barcode Scanner</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-            Pilih alat yang Anda gunakan untuk scan barcode barang.
-          </p>
-          
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-            <button 
-              className={`btn w-full ${scannerMode === 'camera' ? '' : 'btn-outline'}`}
-              onClick={() => saveScannerMode('camera')}
-            >
-              📷 Kamera Laptop / HP
-            </button>
-            <button 
-              className={`btn w-full ${scannerMode === 'physical' ? '' : 'btn-outline'}`}
-              onClick={() => saveScannerMode('physical')}
-            >
-              🔫 Alat Scanner (USB/Bluetooth)
-            </button>
-          </div>
-
-          {scannerMode === 'camera' ? (
-            <div style={{ padding: '1rem', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
-              <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pilih Kamera yang Digunakan</h3>
-              {cameras.length === 0 ? (
-                <div style={{ padding: '1rem', background: '#fefce8', borderRadius: '10px', color: '#713f12', fontSize: '0.9rem' }}>
-                  ⚠️ Tidak ada kamera yang terdeteksi. Pastikan browser mendapat izin akses kamera.
-                </div>
-              ) : (
-                <>
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
-                    <select value={selectedCamera} onChange={e => setSelectedCamera(e.target.value)}>
-                      {cameras.map(c => (
-                        <option key={c.id} value={c.id}>{c.label || `Kamera (${c.id.slice(0, 12)}...)`}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button className="btn" onClick={saveCamera} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {cameraSaved ? '✅ Kamera Tersimpan!' : '💾 Simpan Pilihan Kamera'}
-                  </button>
-                </>
-              )}
-            </div>
-          ) : (
-            <div style={{ padding: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#166534', fontSize: '0.9rem' }}>
-              <strong>✅ Mode Scanner Alat Aktif!</strong><br/>
-              Colokkan alat scanner ke USB PC atau hubungkan lewat Bluetooth. Sistem otomatis mendeteksi tembakan barcode.
-            </div>
-          )}
+        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+          Pilih alat yang Anda gunakan untuk scan barcode barang.
+        </p>
+        
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+          <button 
+            className={`btn w-full ${scannerMode === 'camera' ? '' : 'btn-outline'}`}
+            onClick={() => saveScannerMode('camera')}
+          >
+            📷 Kamera Laptop / HP
+          </button>
+          <button 
+            className={`btn w-full ${scannerMode === 'physical' ? '' : 'btn-outline'}`}
+            onClick={() => saveScannerMode('physical')}
+          >
+            🔫 Alat Scanner (USB/Bluetooth)
+          </button>
         </div>
-      ) : (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h2 className="card-title">🔍 Mode Alat Barcode Scanner</h2>
-          <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', color: '#991b1b', fontSize: '0.9rem' }}>
-            🔒 Mode scanner (Kamera / USB) hanya dapat diubah oleh <strong>Admin</strong>.
+
+        {scannerMode === 'camera' ? (
+          <div style={{ padding: '1rem', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Pilih Kamera yang Digunakan</h3>
+            {cameras.length === 0 ? (
+              <div style={{ padding: '1rem', background: '#fefce8', borderRadius: '10px', color: '#713f12', fontSize: '0.9rem' }}>
+                ⚠️ Tidak ada kamera yang terdeteksi. Pastikan browser mendapat izin akses kamera.
+              </div>
+            ) : (
+              <>
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <select value={selectedCamera} onChange={e => setSelectedCamera(e.target.value)}>
+                    {cameras.map(c => (
+                      <option key={c.id} value={c.id}>{c.label || `Kamera (${c.id.slice(0, 12)}...)`}</option>
+                    ))}
+                  </select>
+                </div>
+                <button className="btn" onClick={saveCamera} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {cameraSaved ? '✅ Kamera Tersimpan!' : '💾 Simpan Pilihan Kamera'}
+                </button>
+              </>
+            )}
           </div>
+        ) : (
+          <div style={{ padding: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#166534', fontSize: '0.9rem' }}>
+            <strong>✅ Mode Scanner Alat Aktif!</strong><br/>
+            Colokkan alat scanner ke USB PC atau hubungkan lewat Bluetooth. Sistem otomatis mendeteksi tembakan barcode.
+          </div>
+        )}
         </div>
       )}
 
-      {/* === PRINTER & LACI KASIR === */}
-      <div className="card">
-        <h2 className="card-title">🖨️ Printer Bluetooth & Laci Kasir</h2>
+      {/* === PRINTER & LACI KASIR (Hanya Kasir) === */}
+      {!isAdmin && (
+        <div className="card">
+          <h2 className="card-title">🖨️ Pengaturan Printer & Laci Kasir</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-          Sambungkan perangkat ini ke printer thermal Bluetooth Anda. Laci uang (Cash Drawer) umumnya
-          dihubungkan lewat kabel RJ11 ke printer. Jika printer menerima sinyal, ia akan membuka laci secara otomatis.
+          Pilih jenis printer yang Anda gunakan di perangkat ini.
         </p>
+
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+          <button 
+            className={`btn w-full ${printerType === 'kabel' ? '' : 'btn-outline'}`}
+            onClick={() => savePrinterType('kabel')}
+          >
+            🔌 Printer Kabel (Browser Print)
+          </button>
+          <button 
+            className={`btn w-full ${printerType === 'bluetooth' ? '' : 'btn-outline'}`}
+            onClick={() => savePrinterType('bluetooth')}
+          >
+            📶 Printer Bluetooth
+          </button>
+        </div>
+
+        {printerType === 'bluetooth' && (
+          <>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+              Laci uang (Cash Drawer) umumnya dihubungkan lewat kabel RJ11 ke printer Bluetooth. 
+              Gunakan tombol di bawah untuk menguji koneksi.
+            </p>
 
         <div style={{
           padding: '1rem', background: 'var(--bg)', borderRadius: 'var(--radius-md)',
@@ -263,10 +293,20 @@ export default function SettingsClient({ role }: Props) {
           </span>
         </div>
 
-        <button className="btn btn-success w-full" onClick={testDrawer} style={{ padding: '1rem', fontSize: '1.05rem' }}>
-          🔌 Uji Koneksi & Buka Laci (Test Drawer Kick)
-        </button>
-      </div>
+          <button className="btn btn-success w-full" onClick={testDrawer} style={{ padding: '1rem', fontSize: '1.05rem' }}>
+            🔌 Uji Koneksi & Buka Laci (Bluetooth)
+          </button>
+          </>
+        )}
+        
+        {printerType === 'kabel' && (
+          <div style={{ padding: '1rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', color: '#1e3a8a', fontSize: '0.9rem' }}>
+            <strong>✅ Printer Kabel Dipilih</strong><br/>
+            Sistem akan menggunakan fungsi pencetakan bawaan OS. Pastikan printer POS Anda sudah terpasang (Default) di Windows/Mac agar proses cetak lebih lancar tanpa banyak klik. Laci uang otomatis terbuka jika Anda mengaturnya di menu <em>Printer Properties (Cash Drawer / Cut)</em> di OS Anda.
+          </div>
+        )}
+        </div>
+      )}
 
       {/* === INFO AKUN === */}
       <div className="card" style={{ marginTop: '1.5rem' }}>

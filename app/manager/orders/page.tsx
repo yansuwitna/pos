@@ -36,6 +36,7 @@ export default function OrderPage() {
   const [showForm, setShowForm] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [printData, setPrintData] = useState<any>(null);
+  const [tableLoading, setTableLoading] = useState(true);
 
   // Modal Barang Baru
   const [showNewItemModal, setShowNewItemModal] = useState(false);
@@ -68,9 +69,11 @@ export default function OrderPage() {
   };
 
   const fetchHistory = async () => {
+    setTableLoading(true);
     const res = await fetch('/api/orders');
     const data = await res.json();
     if (data.success) setHistory(data.orders);
+    setTableLoading(false);
   };
 
   const startScanner = () => {
@@ -177,6 +180,30 @@ export default function OrderPage() {
     setIsAddingNew(false);
   };
 
+  const handleDelete = async (id: string) => {
+    const result = await Swal.fire({
+      title: 'Hapus Pesanan (PO)?',
+      text: 'Data PO akan dihapus secara permanen. Lanjutkan?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#3b82f6',
+      confirmButtonText: 'Ya, Hapus!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!result.isConfirmed) return;
+
+    const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      Swal.fire('Terhapus!', data.message, 'success');
+      fetchHistory();
+    } else {
+      Swal.fire('Gagal', data.message, 'error');
+    }
+  };
+
   const submitOrder = async () => {
     if (cart.length === 0) return Swal.fire('Peringatan', "Belum ada barang untuk dipesan.", 'warning');
     if (!selectedSupplier) return Swal.fire('Peringatan', "Supplier harus dipilih untuk surat pemesanan.", 'warning');
@@ -231,72 +258,21 @@ export default function OrderPage() {
     }, 500);
   };
 
-  // Render Print Area
-  if (printData) {
-    return (
-      <div style={{ padding: '2rem', fontFamily: 'monospace', maxWidth: '800px', margin: '0 auto', background: 'white', color: 'black' }}>
-        <h1 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>SURAT PEMESANAN BARANG (PURCHASE ORDER)</h1>
-        <div style={{ textAlign: 'center', borderBottom: '2px dashed black', paddingBottom: '1rem', marginBottom: '1rem' }}>
-          <p>Tanggal PO: {new Date(printData.createdAt).toLocaleDateString('id-ID')}</p>
-          <p>Nomor PO: PO-{printData.id.substring(0,8).toUpperCase()}</p>
-        </div>
-        
-        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
-          <div>
-            <p><strong>Kepada Yth:</strong></p>
-            <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{printData.supplier?.name || '______________________'}</p>
-            {printData.supplier?.contact && <p>Telp: {printData.supplier.contact}</p>}
-            {printData.supplier?.address && <p>{printData.supplier.address}</p>}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p><strong>Pemesan:</strong></p>
-            <p>{printData.user?.name || '-'}</p>
-          </div>
-        </div>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>No</th>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Nama Barang</th>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>Jumlah Pesanan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {printData.items.map((item: any, idx: number) => (
-              <tr key={idx}>
-                <td style={{ border: '1px solid black', padding: '0.5rem' }}>{idx + 1}</td>
-                <td style={{ border: '1px solid black', padding: '0.5rem' }}>{item.productName || item.product?.name} <br/> <small>{item.product?.sku}</small></td>
-                <td style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {printData.notes && (
-          <div style={{ marginBottom: '2rem' }}>
-            <p><strong>Catatan Tambahan:</strong></p>
-            <p style={{ padding: '0.5rem', border: '1px solid black' }}>{printData.notes}</p>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '3rem' }}>
-          <div style={{ textAlign: 'center' }}>
-            <p>Hormat Kami (Pemesan),</p>
-            <br/><br/><br/>
-            <p>( {printData.user?.name || '_________________'} )</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="card" style={{ display: showForm ? 'none' : 'block' }}>
+      <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📜 Riwayat Pesanan (PO)</h2>
-          <button className="btn btn-success" onClick={() => setShowForm(true)}>➕ Buat Pesanan Baru</button>
+          {!showForm && (
+            <button className="btn btn-success" onClick={() => {
+              setCart([]);
+              setSelectedSupplier('');
+              setNotes('');
+              setOrderDate(new Date().toISOString().split('T')[0]);
+              setEditOrder(null);
+              setShowForm(true);
+            }}>➕ Buat Pesanan Baru</button>
+          )}
         </div>
         <div className="table-container">
           <table>
@@ -310,7 +286,13 @@ export default function OrderPage() {
               </tr>
             </thead>
             <tbody>
-              {history.map((h: any) => (
+              {tableLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <div className="spinner"></div> Memuat data...
+                  </td>
+                </tr>
+              ) : history.map((h: any) => (
                 <tr key={h.id}>
                   <td>PO-{h.id.substring(0,8).toUpperCase()}</td>
                   <td>{new Date(h.createdAt).toLocaleDateString('id-ID')}</td>
@@ -336,6 +318,9 @@ export default function OrderPage() {
                       }}>
                         ✏️ Edit PO
                       </button>
+                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
+                        Hapus
+                      </button>
                       <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => handlePrint(h)}>
                         🖨️ Cetak PO
                       </button>
@@ -345,128 +330,134 @@ export default function OrderPage() {
               ))}
             </tbody>
           </table>
-          {history.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada data pesanan (Purchase Order).</p>}
+          {!tableLoading && history.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada data pesanan (Purchase Order).</p>}
         </div>
       </div>
 
       {showForm && (
-        <div className="grid-2">
-          <div className="card" style={{ position: 'relative', zIndex: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 className="card-title" style={{ marginBottom: 0 }}>
-                {editOrder ? '✏️ Edit Pesanan (PO)' : '🔙 Form Pemesanan Baru'}
-              </h2>
-              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditOrder(null); }}>Batal</button>
-            </div>
-            
-            <p style={{ color: '#0369a1', background: '#e0f2fe', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #bae6fd' }}>
-              ℹ️ Pesanan yang dibuat di sini <strong>TIDAK AKAN</strong> mengubah jumlah stok di sistem. Hanya untuk mencetak dokumen Surat Pesanan (PO) ke Supplier.
-            </p>
-            
-            {scannerMode === 'camera' ? (
-              !scanning && (
-                <button className="btn btn-outline w-full" onClick={startScanner} style={{ padding: '1rem', marginBottom: '1.5rem', fontSize: '1.1rem' }}>
-                  📷 Buka Kamera Scan Barcode
-                </button>
-              )
-            ) : (
-              <div style={{ color: '#166534', background: '#f0fdf4', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1.5rem' }}>
-                🔫 Scanner Alat Aktif! Tembakkan barcode.
+        <div className="modal-overlay">
+          <div className="modal-content large" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="modal-header">
+                <h2 className="modal-title">
+                  {editOrder ? '✏️ Edit Pesanan (PO)' : '🔙 Form Pemesanan Baru'}
+                </h2>
+                <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditOrder(null); }}>Tutup</button>
               </div>
-            )}
-
-            {scannerMode === 'camera' && scanning && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <div id="sku-reader-order" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}></div>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Tanggal PO</label>
-                <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} required />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Pilih Supplier (Wajib)</label>
-                <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} required>
-                  <option value="">-- Pilih Supplier --</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="form-group" style={{ marginBottom: '2rem' }}>
-              <label>Cari Manual (Ketik Nama / SKU)</label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                <div style={{ flex: '1 1 200px' }}>
-                  <ProductSearch products={products} onSelect={addToCart} />
+              
+              <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
+                <p style={{ color: '#0369a1', background: '#e0f2fe', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #bae6fd' }}>
+                  ℹ️ Pesanan yang dibuat di sini <strong>TIDAK AKAN</strong> mengubah jumlah stok di sistem. Hanya untuk mencetak dokumen Surat Pesanan (PO) ke Supplier.
+                </p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Tanggal PO</label>
+                    <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} required />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Pilih Supplier (Wajib)</label>
+                    <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} required>
+                      <option value="">-- Pilih Supplier --</option>
+                      {suppliers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <button className="btn" style={{ background: '#10b981', color: 'white', flex: '0 0 auto' }} onClick={() => setShowNewItemModal(true)}>
-                  ➕ Pesan Barang Baru (Belum ada di data)
-                </button>
-              </div>
-            </div>
 
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Dipesan:</h3>
-            
-            {cart.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>Daftar pesanan masih kosong.</p>
-            ) : (
-              <div>
-                {cart.map((item, idx) => (
-                  <div key={idx} style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-                    <div style={{ flex: '1 1 200px' }}>
-                      <div style={{ fontWeight: 600 }}>{item.product.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>SKU: {item.product.sku || '-'}</div>
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  {scannerMode === 'camera' ? (
+                    !scanning && (
+                      <button className="btn btn-outline w-full" onClick={startScanner} style={{ padding: '0.75rem', fontSize: '1rem' }}>
+                        📷 Buka Kamera Scan Barcode
+                      </button>
+                    )
+                  ) : (
+                    <div style={{ color: '#166534', background: '#f0fdf4', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1.5rem' }}>
+                      🔫 Scanner Alat Aktif! Tembakkan barcode.
                     </div>
-                    
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 100px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jumlah (Qty)</label>
-                        <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1)} style={{ padding: '0.4rem' }} />
+                  )}
+
+                  {scannerMode === 'camera' && scanning && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <div id="sku-reader-order" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}></div>
+                    </div>
+                  )}
+                  
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label>Cari Manual (Ketik Nama / SKU)</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      <div style={{ flex: '1 1 200px' }}>
+                        <ProductSearch products={products} onSelect={addToCart} />
                       </div>
-                    </div>
-
-                    <div style={{ flex: '0 0 auto' }}>
-                      <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>❌</button>
+                      <button className="btn" style={{ background: '#10b981', color: 'white', flex: '0 0 auto' }} onClick={() => setShowNewItemModal(true)}>
+                        ➕ Pesan Barang Baru
+                      </button>
                     </div>
                   </div>
-                ))}
-                
-                <div className="form-group mt-4">
-                  <label>Catatan Tambahan (Opsional)</label>
-                  <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Tulis catatan di surat pesanan..." />
                 </div>
 
-                <button className="btn w-full mt-4" style={{ background: '#0284c7' }} onClick={submitOrder} disabled={loading}>
-                  {loading ? 'Menyimpan...' : (editOrder ? '💾 Simpan Perubahan PO' : '✅ Simpan & Cetak Pesanan (PO)')}
-                </button>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Dipesan:</h3>
+                
+                {cart.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>Daftar pesanan masih kosong.</p>
+                ) : (
+                  <div>
+                    {cart.map((item, idx) => (
+                      <div key={idx} style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                        <div style={{ flex: '1 1 200px' }}>
+                          <div style={{ fontWeight: 600 }}>{item.product.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>SKU: {item.product.sku || '-'}</div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 100px' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jumlah (Qty)</label>
+                            <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1)} style={{ padding: '0.4rem' }} />
+                          </div>
+                        </div>
+
+                        <div style={{ flex: '0 0 auto' }}>
+                          <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>❌</button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <div className="form-group mt-4">
+                      <label>Catatan Tambahan (Opsional)</label>
+                      <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Tulis catatan di surat pesanan..." />
+                    </div>
+
+                    <button className="btn w-full mt-4" style={{ background: '#0284c7' }} onClick={submitOrder} disabled={loading}>
+                      {loading ? 'Menyimpan...' : (editOrder ? '💾 Simpan Perubahan PO' : '✅ Simpan & Cetak Pesanan (PO)')}
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          
-          <div className="card">
-            <h2 className="card-title">📦 Info Stok Saat Ini</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sebagai referensi, berikut daftar stok saat ini:</p>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nama Produk</th>
-                    <th>Sisa Stok</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p.id}>
-                      <td style={{ fontWeight: 600 }}>{p.name}</td>
-                      <td style={{ fontWeight: 600, color: p.stock < 5 ? '#ef4444' : 'inherit' }}>{p.stock}</td>
+            </div>
+            
+            <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', height: '100%', overflowY: 'auto' }}>
+              <h2 className="card-title">📦 Info Stok Saat Ini</h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sebagai referensi, berikut daftar stok saat ini:</p>
+              <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <table style={{ fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Nama Produk</th>
+                      <th>Sisa Stok</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {products.map(p => (
+                      <tr key={p.id}>
+                        <td style={{ fontWeight: 600 }}>{p.name}</td>
+                        <td style={{ fontWeight: 600, color: p.stock < 5 ? '#ef4444' : 'inherit' }}>{p.stock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -474,21 +465,92 @@ export default function OrderPage() {
 
       {/* Modal Quick Add Product */}
       {showNewItemModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="card" style={{ width: '90%', maxWidth: '400px', background: 'white' }}>
-            <h3 style={{ marginBottom: '1rem' }}>📦 Pesan Barang Baru</h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Gunakan fitur ini jika Anda ingin memesan barang yang belum pernah Anda daftarkan di sistem (tidak ada barcode-nya).
-            </p>
-            <div className="form-group">
-              <label>Nama Barang (yang akan dipesan)</label>
-              <input type="text" value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Misal: Indomie Goreng Spesial" autoFocus />
+        <div className="modal-overlay" style={{ zIndex: 1010 }}>
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">📦 Pesan Barang Baru</h3>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setShowNewItemModal(false)}>Tutup</button>
             </div>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowNewItemModal(false)}>Batal</button>
-              <button className="btn" style={{ flex: 1, background: '#0284c7', color: 'white' }} onClick={handleQuickAddProduct} disabled={isAddingNew}>
-                {isAddingNew ? 'Menambahkan...' : 'Tambahkan ke Pesanan'}
-              </button>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Gunakan fitur ini jika Anda ingin memesan barang yang belum pernah Anda daftarkan di sistem (tidak ada barcode-nya).
+              </p>
+              <div className="form-group">
+                <label>Nama Barang (yang akan dipesan)</label>
+                <input type="text" value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Misal: Indomie Goreng Spesial" autoFocus />
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowNewItemModal(false)}>Batal</button>
+                <button className="btn" style={{ flex: 1, background: '#0284c7', color: 'white' }} onClick={handleQuickAddProduct} disabled={isAddingNew}>
+                  {isAddingNew ? 'Menambahkan...' : 'Tambahkan ke Pesanan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cetak (Print Data) */}
+      {printData && (
+        <div className="modal-overlay" style={{ zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="print-area" style={{ padding: '2rem', fontFamily: 'monospace', background: 'white', color: 'black' }}>
+              <h1 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>SURAT PEMESANAN BARANG (PURCHASE ORDER)</h1>
+              <div style={{ textAlign: 'center', borderBottom: '2px dashed black', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                <p>Tanggal PO: {new Date(printData.createdAt).toLocaleDateString('id-ID')}</p>
+                <p>Nomor PO: PO-{printData.id.substring(0,8).toUpperCase()}</p>
+              </div>
+              
+              <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <p><strong>Kepada Yth:</strong></p>
+                  <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{printData.supplier?.name || '______________________'}</p>
+                  {printData.supplier?.contact && <p>Telp: {printData.supplier.contact}</p>}
+                  {printData.supplier?.address && <p>{printData.supplier.address}</p>}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p><strong>Pemesan:</strong></p>
+                  <p>{printData.user?.name || '-'}</p>
+                </div>
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem' }}>
+                <thead>
+                  <tr>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>No</th>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Nama Barang</th>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>Jumlah Pesanan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {printData.items.map((item: any, idx: number) => (
+                    <tr key={idx}>
+                      <td style={{ border: '1px solid black', padding: '0.5rem' }}>{idx + 1}</td>
+                      <td style={{ border: '1px solid black', padding: '0.5rem' }}>{item.productName || item.product?.name} <br/> <small>{item.product?.sku}</small></td>
+                      <td style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {printData.notes && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <p><strong>Catatan Tambahan:</strong></p>
+                  <p style={{ padding: '0.5rem', border: '1px solid black' }}>{printData.notes}</p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '3rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p>Hormat Kami (Pemesan),</p>
+                  <br/><br/><br/>
+                  <p>( {printData.user?.name || '_________________'} )</p>
+                </div>
+              </div>
+            </div>
+            <div className="no-print" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPrintData(null)}>Tutup</button>
+              <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Cetak</button>
             </div>
           </div>
         </div>

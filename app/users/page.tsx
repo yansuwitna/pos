@@ -33,13 +33,16 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg]         = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
 
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
+    setTableLoading(true);
     const res = await fetch('/api/users');
     const data = await res.json();
     if (data.success) setUsers(data.users);
+    setTableLoading(false);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -118,9 +121,9 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="grid-2">
+      <div>
         {/* Tabel daftar user */}
-        <div className="card" style={{ gridColumn: showForm ? 'unset' : '1 / -1' }}>
+        <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 className="card-title" style={{ marginBottom: 0 }}>👥 Daftar User ({users.length})</h2>
             {!showForm && (
@@ -139,7 +142,13 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map(u => {
+                {tableLoading ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
+                      <div className="spinner"></div> Memuat data...
+                    </td>
+                  </tr>
+                ) : users.map(u => {
                   const isUsed = u._count && (u._count.transactions > 0 || u._count.purchases > 0 || u._count.returns > 0 || u._count.orders > 0);
                   
                   return (
@@ -189,17 +198,20 @@ export default function UsersPage() {
                 })}
               </tbody>
             </table>
-            {users.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada data user.</p>}
+            {!tableLoading && users.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada data user.</p>}
           </div>
         </div>
 
         {/* Form tambah / edit user */}
         {showForm && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h2 className="card-title" style={{ marginBottom: 0 }}>{editUser ? '✏️ Edit User' : '➕ Tambah User'}</h2>
-            <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditUser(null); }}>Tutup</button>
-          </div>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title">{editUser ? '✏️ Edit User' : '➕ Tambah User'}</h2>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditUser(null); }}>Tutup</button>
+            </div>
+
+            <div className="modal-body">
 
           {editUser ? (
             <form onSubmit={handleUpdate}>
@@ -271,6 +283,8 @@ export default function UsersPage() {
               </button>
             </form>
           )}
+            </div>
+          </div>
         </div>
         )}
       </div>

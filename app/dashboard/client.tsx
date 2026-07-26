@@ -9,6 +9,8 @@ export default function DashboardClient({ role, name }: Props) {
   const [storeInfo, setStoreInfo] = useState<any>({
     name: 'POS Pro', address: '', phone: '', greeting: 'Terima Kasih', logo: ''
   });
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
     const savedStore = localStorage.getItem('pos_store_info');
@@ -25,6 +27,18 @@ export default function DashboardClient({ role, name }: Props) {
           }
         });
     }
+
+    if (role === 'ADMIN') {
+      setStatsLoading(true);
+      fetch('/api/dashboard/stats')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setAdminStats(data.data);
+          }
+          setStatsLoading(false);
+        });
+    }
   }, [role]);
 
   const viewReceipt = (trx: any) => {
@@ -37,7 +51,9 @@ export default function DashboardClient({ role, name }: Props) {
 
     setReceiptData({
       items,
-      total: trx.total,
+      total: trx.total, // subtotal
+      discount: trx.discount || 0,
+      grandTotal: trx.grandTotal || trx.total, // backward compatibility
       payment: trx.payment,
       change: trx.change,
       date: new Date(trx.createdAt)
@@ -103,22 +119,87 @@ export default function DashboardClient({ role, name }: Props) {
       )}
 
       {role === 'ADMIN' && (
-        <div className="grid-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          
+          {/* Section: Ringkasan Statistik */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-main)' }}>Ringkasan Bulan Ini</h2>
+            {statsLoading ? (
+              <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+                <div className="spinner"></div> Memuat data statistik...
+              </div>
+            ) : adminStats ? (
+              <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Barang</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 700 }}>{adminStats.productCount}</div>
+                </div>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Transaksi</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 700 }}>{adminStats.transactionCount}</div>
+                </div>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Omset</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Rp {adminStats.totalRevenue.toLocaleString('id-ID')}</div>
+                </div>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Laba Bersih</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Rp {adminStats.netProfit.toLocaleString('id-ID')}</div>
+                </div>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #ec4899, #be185d)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Biaya Operasional</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Rp {adminStats.totalExpense.toLocaleString('id-ID')}</div>
+                </div>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #ef4444, #b91c1c)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Hutang</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Rp {adminStats.totalDebt.toLocaleString('id-ID')}</div>
+                </div>
+                <div className="card" style={{ background: 'linear-gradient(135deg, #14b8a6, #0f766e)', color: 'white', border: 'none' }}>
+                  <div style={{ opacity: 0.8, fontSize: '0.9rem', marginBottom: '0.5rem' }}>Total Piutang</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Rp {adminStats.totalReceivable.toLocaleString('id-ID')}</div>
+                </div>
+              </div>
+            ) : (
+              <p>Gagal memuat statistik.</p>
+            )}
+          </div>
+
+          {/* Section: Menu Navigasi */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-main)' }}>Menu Akses Cepat</h2>
+            <div className="grid-3">
+              <a href="/manager/reports" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📈</div>
+            <h2 style={{ fontSize: '1.25rem' }}>Laporan Keuangan</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Laba Rugi, Neraca, Arus Kas.</p>
+          </a>
           <a href="/reports" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
-            <h2 style={{ fontSize: '1.25rem' }}>Lihat Laporan</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pantau pendapatan dan penjualan barang.</p>
+            <h2 style={{ fontSize: '1.25rem' }}>Laporan Penjualan</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pantau transaksi dan pendapatan.</p>
+          </a>
+          <a href="/manager/finances" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💼</div>
+            <h2 style={{ fontSize: '1.25rem' }}>Hutang & Piutang</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Manajemen hutang supplier & piutang pelanggan.</p>
+          </a>
+          <a href="/manager/expenses" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💸</div>
+            <h2 style={{ fontSize: '1.25rem' }}>Biaya Operasional</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Pencatatan pengeluaran harian toko.</p>
           </a>
           <a href="/users" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
             <h2 style={{ fontSize: '1.25rem' }}>Manajemen User</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tambah atau kelola akun karyawan.</p>
           </a>
-          <a href="/settings" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
-            <h2 style={{ fontSize: '1.25rem' }}>Pengaturan</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Atur profil struk dan kamera toko.</p>
-          </a>
+              <a href="/settings" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
+                <h2 style={{ fontSize: '1.25rem' }}>Pengaturan</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Atur profil struk dan kamera toko.</p>
+              </a>
+            </div>
+          </div>
         </div>
       )}
 
@@ -170,9 +251,19 @@ export default function DashboardClient({ role, name }: Props) {
                 ))}
               </div>
               
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
+                <span>Subtotal</span>
+                <span>Rp {receiptData.total.toLocaleString('id-ID')}</span>
+              </div>
+              {receiptData.discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Diskon</span>
+                  <span>-Rp {receiptData.discount.toLocaleString('id-ID')}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem', marginTop: '0.5rem' }}>
                 <span>TOTAL</span>
-                <span>Rp {receiptData.total.toLocaleString('id-ID')}</span>
+                <span>Rp {receiptData.grandTotal.toLocaleString('id-ID')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
                 <span>TUNAI</span>

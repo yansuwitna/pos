@@ -14,28 +14,38 @@ export const metadata: Metadata = {
   title: "POS Pro - Point of Sale",
   description: "Point of Sale Modern Web App",
 };
+// Force update
 
 const roleNavLinks: Record<string, { href: string; label: string }[]> = {
   ADMIN: [
     { href: '/dashboard', label: '🏠 Dashboard' },
     { href: '/dashboard/products', label: '📦 Stok Barang' },
+    { href: '/manager/expenses', label: '💸 Biaya Operasional' },
+    { href: '/manager/finances', label: '💼 Hutang / Piutang' },
+    { href: '/manager/reports', label: '📈 Laporan Keuangan' },
+    { href: '/manager/discount-rules', label: '🎟️ Aturan Diskon' },
+    { href: '/customers', label: '👥 Daftar Pelanggan' },
     { href: '/users',     label: '👥 Manajemen User' },
-    { href: '/reports',   label: '📊 Laporan' },
+    { href: '/reports',   label: '📊 Laporan Penjualan' },
     { href: '/backup',    label: '💾 Backup / Restore' },
     { href: '/settings',  label: '⚙️ Pengaturan' },
   ],
   CASHIER: [
     { href: '/dashboard', label: '🏠 Dashboard' },
     { href: '/pos',     label: '🛍️ Transaksi (Kasir)' },
+    { href: '/customers', label: '👥 Daftar Pelanggan' },
+    { href: '/manager/finances', label: '💼 Piutang Pelanggan' },
     { href: '/settings',label: '⚙️ Pengaturan' },
   ],
   WAREHOUSE: [
     { href: '/dashboard', label: '🏠 Dashboard' },
     { href: '/manager', label: '📦 Manajemen Barang' },
+    { href: '/manager/opname', label: '📋 Stok Opname' },
     { href: '/manager/orders', label: '📝 Pesanan (PO)' },
     { href: '/manager/purchase', label: '📥 Restock' },
     { href: '/manager/return', label: '📤 Retur' },
     { href: '/manager/suppliers', label: '🏢 Supplier' },
+    { href: '/manager/finances', label: '💼 Hutang Supplier' },
     { href: '/settings', label: '⚙️ Pengaturan' },
   ],
 };

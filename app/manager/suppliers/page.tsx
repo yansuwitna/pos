@@ -20,17 +20,20 @@ export default function SuppliersPage() {
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
 
   useEffect(() => {
     fetchSuppliers();
   }, []);
 
   const fetchSuppliers = async () => {
+    setTableLoading(true);
     const res = await fetch('/api/suppliers');
     const data = await res.json();
     if (data.success) {
       setSuppliers(data.suppliers);
     }
+    setTableLoading(false);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -117,8 +120,8 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="grid-2">
-      <div className="card" style={{ gridColumn: showForm ? 'unset' : '1 / -1' }}>
+    <div>
+      <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📋 Daftar Penyedia Barang ({suppliers.length})</h2>
           {!showForm && (
@@ -136,7 +139,13 @@ export default function SuppliersPage() {
               </tr>
             </thead>
             <tbody>
-              {suppliers.map(s => {
+              {tableLoading ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <div className="spinner"></div> Memuat data...
+                  </td>
+                </tr>
+              ) : suppliers.map(s => {
                 const isUsed = s._count && (s._count.purchases > 0 || s._count.returns > 0 || s._count.orders > 0);
                 return (
                   <tr key={s.id}>
@@ -166,48 +175,50 @@ export default function SuppliersPage() {
               })}
             </tbody>
           </table>
-          {suppliers.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada penyedia barang.</p>}
+          {!tableLoading && suppliers.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada penyedia barang.</p>}
         </div>
       </div>
 
       {showForm && (
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 className="card-title" style={{ marginBottom: 0 }}>
-            {editSupplier ? '✏️ Edit Penyedia Barang' : '🏢 Tambah Penyedia Barang (Supplier)'}
-          </h2>
-          <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditSupplier(null); }}>Tutup</button>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2 className="modal-title">{editSupplier ? '✏️ Edit Penyedia Barang' : '🏢 Tambah Penyedia Barang (Supplier)'}</h2>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditSupplier(null); }}>Tutup</button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleSave}>
+                <div className="form-group">
+                  <label>Nama Penyedia (Perusahaan/Toko)</label>
+                  <input 
+                    type="text" 
+                    value={editSupplier ? editSupplier.name : form.name} 
+                    onChange={e => editSupplier ? setEditSupplier({...editSupplier, name: e.target.value}) : setForm({...form, name: e.target.value})} 
+                    placeholder="Contoh: PT. Maju Jaya" required />
+                </div>
+                <div className="form-group">
+                  <label>Kontak (No HP / Telepon)</label>
+                  <input 
+                    type="text" 
+                    value={editSupplier ? (editSupplier.contact || '') : form.contact} 
+                    onChange={e => editSupplier ? setEditSupplier({...editSupplier, contact: e.target.value}) : setForm({...form, contact: e.target.value})} 
+                    placeholder="0812xxxxxx" />
+                </div>
+                <div className="form-group">
+                  <label>Alamat</label>
+                  <input 
+                    type="text" 
+                    value={editSupplier ? (editSupplier.address || '') : form.address} 
+                    onChange={e => editSupplier ? setEditSupplier({...editSupplier, address: e.target.value}) : setForm({...form, address: e.target.value})} 
+                    placeholder="Alamat lengkap..." />
+                </div>
+                <button type="submit" className="btn w-full mt-4" disabled={loading}>
+                  {loading ? 'Menyimpan...' : (editSupplier ? '💾 Simpan Perubahan' : '➕ Tambah Penyedia Barang')}
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label>Nama Penyedia (Perusahaan/Toko)</label>
-            <input 
-              type="text" 
-              value={editSupplier ? editSupplier.name : form.name} 
-              onChange={e => editSupplier ? setEditSupplier({...editSupplier, name: e.target.value}) : setForm({...form, name: e.target.value})} 
-              placeholder="Contoh: PT. Maju Jaya" required />
-          </div>
-          <div className="form-group">
-            <label>Kontak (No HP / Telepon)</label>
-            <input 
-              type="text" 
-              value={editSupplier ? (editSupplier.contact || '') : form.contact} 
-              onChange={e => editSupplier ? setEditSupplier({...editSupplier, contact: e.target.value}) : setForm({...form, contact: e.target.value})} 
-              placeholder="0812xxxxxx" />
-          </div>
-          <div className="form-group">
-            <label>Alamat</label>
-            <input 
-              type="text" 
-              value={editSupplier ? (editSupplier.address || '') : form.address} 
-              onChange={e => editSupplier ? setEditSupplier({...editSupplier, address: e.target.value}) : setForm({...form, address: e.target.value})} 
-              placeholder="Alamat lengkap..." />
-          </div>
-          <button type="submit" className="btn w-full mt-4" disabled={loading}>
-            {loading ? 'Menyimpan...' : (editSupplier ? '💾 Simpan Perubahan' : '➕ Tambah Penyedia Barang')}
-          </button>
-        </form>
-      </div>
       )}
     </div>
   );

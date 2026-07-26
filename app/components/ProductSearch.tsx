@@ -42,6 +42,7 @@ export default function ProductSearch({ products, onSelect, placeholder = "Ketik
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width }}>
       <input 
+        id="product-search-input"
         type="text" 
         value={search}
         onChange={e => {

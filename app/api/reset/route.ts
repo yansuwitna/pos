@@ -12,6 +12,8 @@ export async function POST(req: Request) {
 
     await prisma.$transaction(async (tx) => {
       // Hapus berurutan agar foreign key tidak bermasalah
+      
+      // 1. Hapus data transaksi dan relasinya
       await tx.transactionItem.deleteMany();
       await tx.transaction.deleteMany();
       
@@ -23,14 +25,45 @@ export async function POST(req: Request) {
 
       await tx.orderItem.deleteMany();
       await tx.order.deleteMany();
+      
+      // 2. Hapus data stok opname dan keuangan
+      await tx.stockOpnameItem.deleteMany();
+      await tx.stockOpname.deleteMany();
+      
+      await tx.expense.deleteMany();
+      
+      await tx.receivablePayment.deleteMany();
+      await tx.debtPayment.deleteMany();
 
+      // 3. Hapus data master
       await tx.product.deleteMany();
       await tx.category.deleteMany();
       await tx.supplier.deleteMany();
+      await tx.customer.deleteMany();
+      await tx.discountRule.deleteMany();
       
+      // 4. Hapus user selain ADMIN (gunakan id dari session agar 100% aman jika ada bug Enum)
       await tx.user.deleteMany({
-        where: { role: { not: 'ADMIN' } }
+        where: { 
+          AND: [
+            { role: { not: 'ADMIN' } },
+            { id: { not: session?.id } }
+          ]
+        }
       });
+      
+      // Pastikan minimal ada 1 admin tersisa
+      const adminCount = await tx.user.count({ where: { role: 'ADMIN' } });
+      if (adminCount === 0) {
+        await tx.user.create({
+          data: {
+            username: 'admin',
+            password: 'password',
+            name: 'Admin Recovery',
+            role: 'ADMIN'
+          }
+        });
+      }
     });
 
     return Response.json({ success: true, message: "Database berhasil dikosongkan. Hanya akun Admin yang tersisa." });

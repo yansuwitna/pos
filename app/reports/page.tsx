@@ -13,12 +13,26 @@ type Transaction = {
 export default function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}-01`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const y = lastDay.getFullYear();
+    const m = String(lastDay.getMonth() + 1).padStart(2, '0');
+    const day = String(lastDay.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
   const [totalCost, setTotalCost] = useState(0); // Total HPP (Cost of Goods Sold)
   const [showPrint, setShowPrint] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
 
   const fetchReports = () => {
+    setTableLoading(true);
     fetch(`/api/transactions?startDate=${startDate}&endDate=${endDate}`)
       .then(res => res.json())
       .then(data => {
@@ -37,6 +51,7 @@ export default function ReportsPage() {
           setTotalRevenue(revenue);
           setTotalCost(cost);
         }
+        setTableLoading(false);
       });
   };
 
@@ -95,7 +110,13 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {transactions.map(t => (
+              {tableLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <div className="spinner"></div> Memuat data...
+                  </td>
+                </tr>
+              ) : transactions.map(t => (
                 <tr key={t.id}>
                   <td style={{ color: 'var(--text-muted)' }}>{new Date(t.createdAt).toLocaleString('id-ID')}</td>
                   <td>
@@ -113,7 +134,7 @@ export default function ReportsPage() {
               ))}
             </tbody>
           </table>
-          {transactions.length === 0 && <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Belum ada data transaksi.</p>}
+          {!tableLoading && transactions.length === 0 && <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Belum ada data transaksi.</p>}
         </div>
       </div>
 
@@ -124,7 +145,7 @@ export default function ReportsPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div className="card" style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div id="print-area" style={{ padding: '2rem', background: '#fff', color: '#000' }}>
+            <div id="print-area" className="print-area" style={{ padding: '2rem', background: '#fff', color: '#000' }}>
               <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '1rem', marginBottom: '2rem' }}>
                 <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>LAPORAN PENJUALAN</h2>
                 <p style={{ margin: '0.5rem 0 0 0', color: '#555' }}>Periode: {new Date(startDate).toLocaleDateString('id-ID')} s/d {new Date(endDate).toLocaleDateString('id-ID')}</p>
@@ -180,16 +201,7 @@ export default function ReportsPage() {
 
             <div className="no-print" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowPrint(false)}>Tutup</button>
-              <button className="btn btn-success" style={{ flex: 1 }} onClick={() => {
-                const originalContent = document.body.innerHTML;
-                const printArea = document.getElementById('print-area')?.innerHTML;
-                if(printArea) {
-                  document.body.innerHTML = printArea;
-                  window.print();
-                  document.body.innerHTML = originalContent;
-                  window.location.reload();
-                }
-              }}>🖨️ Cetak</button>
+              <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Cetak</button>
             </div>
           </div>
         </div>

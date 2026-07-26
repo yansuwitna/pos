@@ -32,6 +32,10 @@ model User {
   purchases    Purchase[]
   returns      Return[]
   orders       Order[]
+  receivablePayments ReceivablePayment[]
+  debtPayments       DebtPayment[]
+  expenses           Expense[]
+  stockOpnames       StockOpname[]
 }
 
 model Category {
@@ -59,6 +63,24 @@ model Product {
   purchaseItems    PurchaseItem[]
   returnItems      ReturnItem[]
   orderItems       OrderItem[]
+  opnameItems      StockOpnameItem[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  transactions Transaction[]
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+  PARTIAL
 }
 
 model Transaction {
@@ -74,6 +96,26 @@ model Transaction {
   createdAt   DateTime @default(now())
 
   items       TransactionItem[]
+  
+  // Hutang Pelanggan (Piutang Toko)
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  paymentStatus PaymentStatus @default(PAID)
+  amountPaid    Float     @default(0)
+  dueDate       DateTime?
+  
+  receivablePayments ReceivablePayment[]
+}
+
+model ReceivablePayment {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  amount        Float
+  date          DateTime    @default(now())
+  notes         String?
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id])
 }
 
 model TransactionItem {
@@ -98,6 +140,24 @@ model Purchase {
   createdAt   DateTime @default(now())
   
   items       PurchaseItem[]
+
+  // Hutang ke Supplier
+  paymentStatus PaymentStatus @default(PAID)
+  amountPaid    Float         @default(0)
+  dueDate       DateTime?
+  
+  debtPayments  DebtPayment[]
+}
+
+model DebtPayment {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  amount      Float
+  date        DateTime @default(now())
+  notes       String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
 }
 
 model PurchaseItem {
@@ -168,4 +228,49 @@ model OrderItem {
   product     Product  @relation(fields: [productId], references: [id])
   quantity    Int
   productName String?
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   // Operasional, Gaji, dll
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model StockOpname {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  notes     String?
+  createdAt DateTime @default(now())
+
+  items     StockOpnameItem[]
+}
+
+model StockOpnameItem {
+  id          String   @id @default(cuid())
+  opnameId    String
+  opname      StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  productName String?
+  
+  systemStock Int
+  actualStock Int
+  difference  Int      // selisih = actualStock - systemStock
+  notes       String?
+}
+
+model DiscountRule {
+  id              String   @id @default(cuid())
+  name            String
+  minItemQuantity Int?
+  minTransaction  Float?
+  discountPercent Float
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

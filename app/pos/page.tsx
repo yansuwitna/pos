@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
 import ProductSearch from '@/app/components/ProductSearch';
 
@@ -11,7 +11,96 @@ type Product = {
   price: number;
 };
 
+type DiscountRule = {
+  id: string;
+  name: string;
+  minItemQuantity: number | null;
+  minTransaction: number | null;
+  discountPercent: number;
+  isActive: boolean;
+};
+
+type Customer = {
+  id: string;
+  name: string;
+  phone: string | null;
+};
+
 type CartItem = Product & { quantity: number; subtotal: number };
+
+const SearchableSelect = ({ 
+  options, 
+  value, 
+  onChange, 
+  placeholder 
+}: { 
+  options: Customer[], 
+  value: string, 
+  onChange: (val: string) => void,
+  placeholder: string
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  
+  const selectedC = options.find(o => o.id === value);
+  const displayLabel = selectedC ? `${selectedC.name} ${selectedC.phone ? `(${selectedC.phone})` : ''}` : placeholder;
+
+  const filtered = options.filter(c => {
+    const q = search.toLowerCase();
+    return c.name.toLowerCase().includes(q) || (c.phone && c.phone.toLowerCase().includes(q));
+  });
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div 
+        onClick={() => { setOpen(!open); setSearch(''); }}
+        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', cursor: 'pointer', background: '#fff', minHeight: '38px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <span>{displayLabel}</span>
+        <span style={{ fontSize: '0.8rem', color: '#666' }}>▼</span>
+      </div>
+      
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', marginTop: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', maxHeight: '300px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+            <input 
+              autoFocus
+              type="text" 
+              placeholder="Cari nama / no HP..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px' }}>
+            <div 
+              onClick={() => { onChange(''); setOpen(false); }}
+              style={{ padding: '0.5rem', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              {placeholder}
+            </div>
+            {filtered.map(c => (
+              <div 
+                key={c.id} 
+                onClick={() => { onChange(c.id); setOpen(false); }}
+                style={{ padding: '0.5rem', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                {c.name} {c.phone ? `(${c.phone})` : ''}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div style={{ padding: '0.5rem', color: 'gray', textAlign: 'center' }}>Tidak ditemukan</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -19,10 +108,25 @@ export default function POSPage() {
   const [scanning, setScanning] = useState(false);
   const [total, setTotal] = useState(0);
   const [payment, setPayment] = useState('');
+  const [discount, setDiscount] = useState('');
+  const grandTotal = Math.max(0, total - Number(discount || 0));
+  
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  
+  const [discountRules, setDiscountRules] = useState<DiscountRule[]>([]);
+  const [appliedRuleName, setAppliedRuleName] = useState<string | null>(null);
+  
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '' });
+  const [savingCustomer, setSavingCustomer] = useState(false);
   
   const [receiptData, setReceiptData] = useState<{
     items: CartItem[], 
     total: number, 
+    discount: number,
+    grandTotal: number,
     payment: number, 
     change: number,
     date: Date
@@ -38,6 +142,8 @@ export default function POSPage() {
 
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [scannerMode, setScannerMode] = useState('camera');
+  const [scannerObj, setScannerObj] = useState<Html5Qrcode | null>(null);
+  const [printerType, setPrinterType] = useState('kabel');
 
   useEffect(() => {
     fetch('/api/products')
@@ -45,6 +151,21 @@ export default function POSPage() {
       .then(data => {
         if (data.success) setProducts(data.products);
       });
+      
+      fetch('/api/customers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setCustomers(data.customers);
+      });
+      
+    fetch('/api/discount-rules')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setDiscountRules(data.rules.filter((r: DiscountRule) => r.isActive));
+        }
+      });
+      
     const savedCam = localStorage.getItem('pos_camera_id');
     if (savedCam) setSelectedCamera(savedCam);
 
@@ -55,12 +176,57 @@ export default function POSPage() {
 
     const mode = localStorage.getItem('pos_scanner_mode');
     if (mode) setScannerMode(mode);
+
+    const savedPrinterType = localStorage.getItem('pos_printer_type');
+    if (savedPrinterType) setPrinterType(savedPrinterType);
   }, []);
 
   useEffect(() => {
     const newTotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
     setTotal(newTotal);
-  }, [cart]);
+    
+    // Hitung otomatis diskon
+    if (selectedCustomer && newTotal > 0) {
+      const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+      let bestDiscountPercent = 0;
+      let bestRuleName = null;
+      
+      discountRules.forEach(rule => {
+        const hasItemReq = rule.minItemQuantity !== null && rule.minItemQuantity > 0;
+        const hasPriceReq = rule.minTransaction !== null && rule.minTransaction > 0;
+        
+        let isMatch = false;
+        
+        if (hasItemReq && hasPriceReq) {
+          isMatch = (totalItems >= (rule.minItemQuantity as number)) || (newTotal >= (rule.minTransaction as number));
+        } else if (hasItemReq) {
+          isMatch = totalItems >= (rule.minItemQuantity as number);
+        } else if (hasPriceReq) {
+          isMatch = newTotal >= (rule.minTransaction as number);
+        } else {
+          isMatch = true; // tidak ada syarat
+        }
+        
+        if (isMatch) {
+          if (rule.discountPercent > bestDiscountPercent) {
+            bestDiscountPercent = rule.discountPercent;
+            bestRuleName = rule.name;
+          }
+        }
+      });
+      
+      if (bestDiscountPercent > 0) {
+        setDiscount(String((newTotal * bestDiscountPercent) / 100));
+        setAppliedRuleName(`${bestRuleName} (${bestDiscountPercent}%)`);
+      } else {
+        setDiscount('');
+        setAppliedRuleName(null);
+      }
+    } else {
+      setDiscount('');
+      setAppliedRuleName(null);
+    }
+  }, [cart, selectedCustomer, discountRules]);
 
   useEffect(() => {
     if (scannerMode !== 'physical') return;
@@ -100,37 +266,77 @@ export default function POSPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [products, scannerMode]);
 
-  const startScanner = () => {
-    setScanning(true);
-    setTimeout(() => {
-      const scanner = new Html5QrcodeScanner("barcode-reader", { 
-        fps: 15,
-        qrbox: { width: 400, height: 120 },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.CODE_93,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.DATA_MATRIX,
-        ],
-        videoConstraints: selectedCamera 
-          ? { deviceId: { exact: selectedCamera }, facingMode: 'environment' } 
-          : { facingMode: 'environment' }
-      }, false);
-      scanner.render(
-        (decodedText) => {
-          handleScan(decodedText);
-          scanner.clear();
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Jika receipt terbuka
+      if (document.getElementById('receipt-content')) {
+        if (e.key === 'Escape') {
+          setReceiptData(null);
+        } else if (e.key === 'F9') {
+          e.preventDefault();
+          document.getElementById('btn-print-receipt')?.click();
+        }
+      } else {
+        // Jika kasir utama
+        if (e.key === 'F2') {
+          e.preventDefault();
+          document.getElementById('product-search-input')?.focus();
+        } else if (e.key === 'F4') {
+          e.preventDefault();
+          document.getElementById('payment-input')?.focus();
+        } else if (e.key === 'F8') {
+          e.preventDefault();
+          document.getElementById('btn-pay')?.click();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []); // Event delegation via getElementById works without deps
+
+  const toggleScanner = async () => {
+    if (scanning) {
+      if (scannerObj) {
+        try {
+          await scannerObj.stop();
+          scannerObj.clear();
+        } catch (e) {}
+      }
+      setScanning(false);
+      setScannerObj(null);
+    } else {
+      setScanning(true);
+      setTimeout(async () => {
+        try {
+          const scanner = new Html5Qrcode("barcode-reader", {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.CODE_128,
+            ]
+          });
+          setScannerObj(scanner);
+          
+          await scanner.start(
+            selectedCamera ? { deviceId: { exact: selectedCamera } } : { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 300, height: 100 } },
+            (decodedText) => {
+              handleScan(decodedText);
+              // Hentikan otomatis setelah berhasil scan
+              scanner.stop().then(() => {
+                scanner.clear();
+                setScanning(false);
+                setScannerObj(null);
+              }).catch(() => {});
+            },
+            () => {} // Abaikan error per frame
+          );
+        } catch (err) {
+          console.error(err);
+          Swal.fire('Error', 'Gagal mengakses kamera.', 'error');
           setScanning(false);
-        },
-        () => {}
-      );
-    }, 100);
+        }
+      }, 100);
+    }
   };
 
   const handleScan = (sku: string) => {
@@ -185,13 +391,28 @@ export default function POSPage() {
 
   const processTransaction = async () => {
     if (cart.length === 0) return Swal.fire('Peringatan', 'Keranjang kosong!', 'warning');
-    if (!payment || Number(payment) < total) return Swal.fire('Peringatan', 'Uang pembayaran kurang!', 'warning');
+    
+    if (payment === '') return Swal.fire('Peringatan', 'Masukkan nominal uang pembayaran!', 'warning');
+    
+    const isCredit = Number(payment) < grandTotal;
+    if (isCredit && !selectedCustomer) {
+      return Swal.fire('Peringatan', 'Pilih pelanggan terlebih dahulu karena pembayaran kurang (kasbon)!', 'warning');
+    }
+    if (isCredit && !dueDate) {
+      return Swal.fire('Peringatan', 'Pilih tanggal jatuh tempo untuk kasbon!', 'warning');
+    }
     
     try {
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart, payment: Number(payment) })
+        body: JSON.stringify({ 
+          items: cart, 
+          payment: Number(payment),
+          discount: Number(discount || 0),
+          customerId: selectedCustomer || undefined,
+          dueDate: isCredit ? dueDate : undefined
+        })
       });
       const data = await res.json();
       if (!data.success) {
@@ -204,13 +425,49 @@ export default function POSPage() {
     setReceiptData({
       items: [...cart],
       total: total,
+      discount: Number(discount || 0),
+      grandTotal: grandTotal,
       payment: Number(payment),
-      change: Number(payment) - total,
+      change: Number(payment) - grandTotal,
       date: new Date()
     });
     
     setCart([]);
     setPayment('');
+    setDiscount('');
+    setSelectedCustomer('');
+    setDueDate('');
+  };
+
+  const saveNewCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomer.name) return Swal.fire('Peringatan', "Nama Pelanggan wajib diisi", 'warning');
+    setSavingCustomer(true);
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomer)
+      });
+      const data = await res.json();
+      if (data.success) {
+        Swal.fire('Berhasil!', "Pelanggan berhasil ditambahkan!", 'success');
+        // Update customer list with the new one
+        const updated = await (await fetch('/api/customers')).json();
+        if (updated.success) setCustomers(updated.customers);
+        
+        // Find and select the newly added customer if possible
+        setSelectedCustomer(data.customer?.id || '');
+        setNewCustomer({ name: '', phone: '', address: '' });
+        setShowAddCustomer(false);
+      } else {
+        Swal.fire('Gagal', data.message, 'error');
+      }
+    } catch(err) {
+      Swal.fire('Error', "Terjadi kesalahan.", 'error');
+    } finally {
+      setSavingCustomer(false);
+    }
   };
 
   const printReceipt = async () => {
@@ -228,6 +485,14 @@ export default function POSPage() {
     }
   };
 
+  const handlePrint = () => {
+    if (printerType === 'bluetooth') {
+      printReceipt();
+    } else {
+      window.print();
+    }
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -240,11 +505,9 @@ export default function POSPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📷 Scan & Cari Barang</h2>
           {scannerMode === 'camera' ? (
-            !scanning && (
-              <button className="btn btn-outline" onClick={startScanner} style={{ padding: '0.5rem 1rem' }}>
-                Buka Kamera
-              </button>
-            )
+            <button className="btn btn-outline" onClick={toggleScanner} style={{ padding: '0.5rem 1rem' }}>
+              {scanning ? '❌ Tutup Kamera' : '📷 Buka Kamera'}
+            </button>
           ) : (
             <div style={{ color: '#166534', background: '#f0fdf4', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, border: '1px solid #bbf7d0' }}>
               🔫 Scanner USB Aktif
@@ -313,14 +576,68 @@ export default function POSPage() {
         </div>
 
         <div style={{ borderTop: '2px dashed var(--border)', paddingTop: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Total Tagihan</span>
-            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>Rp {total.toLocaleString('id-ID')}</span>
-          </div>
+          {appliedRuleName && (
+            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', color: '#065f46', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>🎟️</span>
+              <div>
+                <strong>Diskon Otomatis Member Diterapkan!</strong>
+                <div style={{ opacity: 0.8 }}>Aturan: {appliedRuleName}</div>
+              </div>
+            </div>
+          )}
+          
+          {discountRules.length > 0 && (
+            <div style={{ marginBottom: '1.5rem', padding: '0.75rem', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', color: '#475569' }}>
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem', color: '#334155' }}>📢 Promo Member Aktif:</div>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                {discountRules.map(rule => (
+                  <li key={rule.id} style={{ marginBottom: '0.2rem' }}>
+                    <strong>{rule.name}</strong> - Diskon <strong>{rule.discountPercent}%</strong>
+                    {rule.minItemQuantity || rule.minTransaction ? ' dengan syarat: ' : ' tanpa syarat.'}
+                    {rule.minItemQuantity ? `Min. ${rule.minItemQuantity} item` : ''}
+                    {rule.minItemQuantity && rule.minTransaction ? ' ATAU ' : ''}
+                    {rule.minTransaction ? `Min. Belanja Rp ${rule.minTransaction.toLocaleString('id-ID')}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label>Uang Pembayaran (Rp)</label>
+            <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Pelanggan (Opsional)</span>
+              <button 
+                className="btn btn-outline" 
+                style={{ padding: '0.1rem 0.4rem', fontSize: '0.75rem' }} 
+                onClick={() => setShowAddCustomer(true)}
+              >
+                + Pelanggan Baru
+              </button>
+            </label>
+            <SearchableSelect 
+              options={customers}
+              value={selectedCustomer}
+              onChange={setSelectedCustomer}
+              placeholder="-- Umum / Non-Member --"
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Total Tagihan</span>
+            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>Rp {grandTotal.toLocaleString('id-ID')}</span>
+          </div>
+          
+          {Number(discount) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Potongan Harga (Diskon)</span>
+              <span style={{ fontSize: '1rem', fontWeight: 600, color: '#059669' }}>-Rp {Number(discount).toLocaleString('id-ID')}</span>
+            </div>
+          )}
+
+          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+            <label>Uang Pembayaran (Rp) [F4]</label>
             <input 
+              id="payment-input"
               type="number" 
               placeholder="0" 
               value={payment} 
@@ -329,20 +646,38 @@ export default function POSPage() {
             />
           </div>
 
+          {payment !== '' && Number(payment) < grandTotal && (
+            <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <div style={{ color: '#b91c1c', fontWeight: 600, marginBottom: '1rem' }}>
+                ⚠️ Pembayaran Kurang (Kasbon)
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Tanggal Jatuh Tempo</label>
+                <input 
+                  type="date" 
+                  value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                />
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
             <span style={{ color: 'var(--text-muted)' }}>Kembalian</span>
             <span style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-              Rp {Math.max(0, Number(payment) - total).toLocaleString('id-ID')}
+              Rp {Math.max(0, Number(payment) - grandTotal).toLocaleString('id-ID')}
             </span>
           </div>
           
           <button 
-            className={`btn w-full ${cart.length === 0 || Number(payment) < total ? '' : 'btn-success'}`}
+            id="btn-pay"
+            className={`btn w-full ${cart.length === 0 || payment === '' ? '' : 'btn-success'}`}
             style={{ padding: '1rem', fontSize: '1.1rem' }} 
             onClick={processTransaction}
-            disabled={cart.length === 0 || Number(payment) < total}
+            disabled={cart.length === 0 || payment === ''}
           >
-            💰 Bayar & Tampilkan Struk
+            💰 Bayar & Tampilkan Struk [F8]
           </button>
         </div>
       </div>
@@ -379,9 +714,19 @@ export default function POSPage() {
                 ))}
               </div>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem', marginTop: '0.5rem' }}>
-                <span>TOTAL</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', marginTop: '0.5rem' }}>
+                <span>SUBTOTAL</span>
                 <span>Rp {receiptData.total.toLocaleString('id-ID')}</span>
+              </div>
+              {receiptData.discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem' }}>
+                  <span>DISKON</span>
+                  <span>-Rp {receiptData.discount.toLocaleString('id-ID')}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem', marginTop: '0.5rem' }}>
+                <span>GRAND TOTAL</span>
+                <span>Rp {receiptData.grandTotal.toLocaleString('id-ID')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
                 <span>TUNAI</span>
@@ -396,10 +741,56 @@ export default function POSPage() {
             </div>
             
             <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1.5rem' }}>
-              <button className="btn btn-outline" style={{ flex: '1 1 100%' }} onClick={() => setReceiptData(null)}>Tutup</button>
-              <button className="btn btn-success" style={{ flex: 1 }} onClick={printReceipt}>🖨️ Bluetooth</button>
-              <button className="btn btn-success" style={{ flex: 1, background: '#3b82f6' }} onClick={() => window.print()}>🖨️ Printer Kabel</button>
+              <button className="btn btn-outline" style={{ flex: '1 1 100%' }} onClick={() => setReceiptData(null)}>Tutup (Esc)</button>
+              <button id="btn-print-receipt" className="btn btn-success" style={{ flex: '1 1 100%' }} onClick={handlePrint}>🖨️ Cetak Struk (F9)</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAddCustomer && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 2000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 className="card-title" style={{ marginBottom: 0 }}>➕ Tambah Pelanggan</h2>
+              <button className="btn btn-outline" style={{ padding: '0.2rem 0.6rem' }} onClick={() => setShowAddCustomer(false)}>Tutup</button>
+            </div>
+            <form onSubmit={saveNewCustomer}>
+              <div className="form-group">
+                <label>Nama Pelanggan</label>
+                <input 
+                  type="text" 
+                  value={newCustomer.name} 
+                  onChange={e => setNewCustomer({...newCustomer, name: e.target.value})} 
+                  placeholder="Contoh: Budi Santoso" required 
+                />
+              </div>
+              <div className="form-group">
+                <label>Nomor HP / WA</label>
+                <input 
+                  type="text" 
+                  value={newCustomer.phone} 
+                  onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})} 
+                  placeholder="0812xxxxxx" 
+                />
+              </div>
+              <div className="form-group">
+                <label>Alamat</label>
+                <input 
+                  type="text" 
+                  value={newCustomer.address} 
+                  onChange={e => setNewCustomer({...newCustomer, address: e.target.value})} 
+                  placeholder="Alamat lengkap..." 
+                />
+              </div>
+              <button type="submit" className="btn btn-success w-full mt-2" disabled={savingCustomer}>
+                {savingCustomer ? 'Menyimpan...' : 'Simpan Pelanggan'}
+              </button>
+            </form>
           </div>
         </div>
       )}

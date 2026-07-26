@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
-    const { items, payment } = await req.json();
+    const { items, payment, customerId, dueDate, discount = 0 } = await req.json();
 
     if (!items || items.length === 0) {
       return Response.json({ success: false, message: "Keranjang kosong" }, { status: 400 });
@@ -56,6 +56,8 @@ export async function POST(req: Request) {
     items.forEach((item: any) => {
       total += item.subtotal;
     });
+    
+    const grandTotal = Math.max(0, total - discount);
 
     const transactionItemsData = items.map((item: any) => ({
       productId: item.id,
@@ -65,17 +67,49 @@ export async function POST(req: Request) {
       subtotal: item.subtotal
     }));
 
-    const transaction = await prisma.transaction.create({
-      data: {
-        userId: userId,
+    let paymentStatus = 'PAID';
+    if (payment < grandTotal) {
+      if (payment > 0) paymentStatus = 'PARTIAL';
+      else paymentStatus = 'UNPAID';
+      
+      if (!customerId) {
+        return Response.json({ success: false, message: "Pelanggan harus dipilih untuk kasbon (pembayaran kurang)." }, { status: 400 });
+      }
+    }
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      const transactionCreateData: any = {
+        userId: userId as string,
         total: total,
-        grandTotal: total,
+        discount: discount,
+        grandTotal: grandTotal,
         payment: payment,
-        change: payment - total,
+        change: payment > grandTotal ? payment - grandTotal : 0,
+        paymentStatus: paymentStatus as any,
+        amountPaid: payment,
+        dueDate: (payment < grandTotal && dueDate) ? new Date(dueDate) : null,
         items: {
           create: transactionItemsData
         }
+      };
+
+      if (customerId) {
+        transactionCreateData.customerId = customerId;
       }
+
+      const createdTx = await tx.transaction.create({
+        data: transactionCreateData
+      });
+
+      // Kurangi stok barang
+      for (const item of items) {
+        await tx.product.update({
+          where: { id: item.id },
+          data: { stock: { decrement: item.quantity } }
+        });
+      }
+
+      return createdTx;
     });
 
     return Response.json({ success: true, transaction });

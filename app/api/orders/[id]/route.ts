@@ -41,3 +41,20 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     return Response.json({ success: false, message: "Gagal menyimpan perubahan pesanan" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  try {
+    // We just delete the order. The orderItems will be deleted automatically if there's cascade,
+    // but to be safe we can use transaction or just prisma.order.delete (assuming cascade is set up)
+    // We already used deleteMany in PUT, so let's do it explicitly if cascade is not set.
+    await prisma.$transaction(async (tx) => {
+      await tx.orderItem.deleteMany({ where: { orderId: params.id } });
+      await tx.order.delete({ where: { id: params.id } });
+    });
+    
+    return Response.json({ success: true, message: "Pesanan berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Delete Order Error:", error);
+    return Response.json({ success: false, message: "Gagal menghapus pesanan" }, { status: 500 });
+  }
+}

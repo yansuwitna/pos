@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
 import ProductSearch from '@/app/components/ProductSearch';
 
@@ -32,11 +32,14 @@ export default function ReturnPage() {
   const [scanning, setScanning] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [scannerMode, setScannerMode] = useState('camera');
+  const [scannerObj, setScannerObj] = useState<Html5Qrcode | null>(null);
   
   const [loading, setLoading] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
+  const [editReturnId, setEditReturnId] = useState<string | null>(null);
   const [printData, setPrintData] = useState<any>(null);
+  const [tableLoading, setTableLoading] = useState(true);
 
   useEffect(() => {
     fetchProducts();
@@ -64,31 +67,56 @@ export default function ReturnPage() {
   };
 
   const fetchHistory = async () => {
+    setTableLoading(true);
     const res = await fetch('/api/returns');
     const data = await res.json();
     if (data.success) setHistory(data.returns);
+    setTableLoading(false);
   };
 
-  const startScanner = () => {
-    setScanning(true);
-    setTimeout(() => {
-      const scanner = new Html5QrcodeScanner("sku-reader-return", { 
-        fps: 15,
-        qrbox: { width: 400, height: 120 },
-        formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128],
-        videoConstraints: selectedCamera 
-          ? { deviceId: { exact: selectedCamera }, facingMode: 'environment' } 
-          : { facingMode: 'environment' }
-      }, false);
-      scanner.render(
-        (decodedText) => {
-          handleScan(decodedText);
-          scanner.clear();
+  const toggleScanner = async () => {
+    if (scanning) {
+      if (scannerObj) {
+        try {
+          await scannerObj.stop();
+          scannerObj.clear();
+        } catch (e) {}
+      }
+      setScanning(false);
+      setScannerObj(null);
+    } else {
+      setScanning(true);
+      setTimeout(async () => {
+        try {
+          const scanner = new Html5Qrcode("sku-reader-return", {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.CODE_128,
+            ]
+          });
+          setScannerObj(scanner);
+          
+          await scanner.start(
+            selectedCamera ? { deviceId: { exact: selectedCamera } } : { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 300, height: 100 } },
+            (decodedText) => {
+              handleScan(decodedText);
+              // Hentikan otomatis setelah berhasil scan
+              scanner.stop().then(() => {
+                scanner.clear();
+                setScanning(false);
+                setScannerObj(null);
+              }).catch(() => {});
+            },
+            () => {} // Abaikan error per frame
+          );
+        } catch (err) {
+          console.error(err);
+          Swal.fire('Error', 'Gagal mengakses kamera.', 'error');
           setScanning(false);
-        },
-        () => {}
-      );
-    }, 100);
+        }
+      }, 100);
+    }
   };
 
   useEffect(() => {
@@ -132,6 +160,8 @@ export default function ReturnPage() {
   const updateCartItem = (productId: string, quantity: number, reason: string) => {
     setCart(cart.map(item => {
       if (item.product.id === productId) {
+        // limit quantity if not editing past data, but here we'll let them adjust manually. 
+        // In real app, might want to limit to stock for new returns.
         return { ...item, quantity: Math.max(1, quantity), reason };
       }
       return item;
@@ -142,12 +172,56 @@ export default function ReturnPage() {
     setCart(cart.filter(x => x.product.id !== productId));
   };
 
+  const handleEdit = (ret: any) => {
+    setEditReturnId(ret.id);
+    setSelectedSupplier(ret.supplierId || '');
+    setReturnDate(new Date(ret.createdAt).toISOString().split('T')[0]);
+    setNotes(ret.notes || '');
+    
+    const mappedCart = ret.items.map((item: any) => {
+      const p = products.find(x => x.id === item.productId);
+      return {
+        product: p || { id: item.productId, name: item.productName || 'Produk Dihapus', sku: '', price: 0, cost: 0, stock: 0 },
+        quantity: item.quantity,
+        reason: item.reason
+      };
+    });
+    
+    setCart(mappedCart);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    const result = await Swal.fire({
+      title: 'Hapus Retur?',
+      text: 'Stok barang akan otomatis dikembalikan (bertambah). Lanjutkan?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#3b82f6',
+      confirmButtonText: 'Ya, Hapus!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!result.isConfirmed) return;
+
+    const res = await fetch(`/api/returns/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      Swal.fire('Terhapus!', data.message, 'success');
+      fetchHistory();
+      fetchProducts();
+    } else {
+      Swal.fire('Gagal', data.message, 'error');
+    }
+  };
+
   const submitReturn = async () => {
     if (cart.length === 0) return Swal.fire('Peringatan', "Belum ada barang.", 'warning');
     
     const confirm = await Swal.fire({
       title: 'Yakin Data Retur Benar?',
-      text: "Stok barang di sistem akan otomatis berkurang!",
+      text: "Stok barang di sistem akan disesuaikan otomatis!",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
@@ -163,7 +237,9 @@ export default function ReturnPage() {
       notes: notes,
       createdAt: new Date(returnDate).toISOString(),
       items: cart.map(item => ({
+        id: item.product.id,
         productId: item.product.id,
+        name: item.product.name,
         productName: item.product.name,
         quantity: item.quantity,
         reason: item.reason
@@ -171,20 +247,31 @@ export default function ReturnPage() {
     };
 
     try {
-      const res = await fetch('/api/returns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      let res;
+      if (editReturnId) {
+        res = await fetch(`/api/returns/${editReturnId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch('/api/returns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
       const data = await res.json();
       setLoading(false);
       
       if (data.success) {
-        Swal.fire('Berhasil!', "Retur berhasil dicatat. Stok berkurang.", 'success');
+        Swal.fire('Berhasil!', editReturnId ? "Perubahan retur berhasil disimpan." : "Retur berhasil dicatat. Stok berkurang.", 'success');
         setCart([]);
         setNotes('');
         setSelectedSupplier('');
         setReturnDate(new Date().toISOString().split('T')[0]);
+        setEditReturnId(null);
         setShowForm(false);
         fetchProducts(); 
         fetchHistory();
@@ -197,85 +284,21 @@ export default function ReturnPage() {
     }
   };
 
-  const handlePrint = (ret: any) => {
-    setPrintData(ret);
-    setTimeout(() => {
-      window.print();
-      setPrintData(null);
-    }, 500);
-  };
-
-  // Render Print Area
-  if (printData) {
-    return (
-      <div style={{ padding: '2rem', fontFamily: 'monospace', maxWidth: '800px', margin: '0 auto', background: 'white', color: 'black' }}>
-        <h1 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>SURAT JALAN RETUR BARANG</h1>
-        <div style={{ textAlign: 'center', borderBottom: '2px dashed black', paddingBottom: '1rem', marginBottom: '1rem' }}>
-          <p>Tanggal: {new Date(printData.createdAt).toLocaleString('id-ID')}</p>
-          <p>ID Retur: {printData.id}</p>
-        </div>
-        
-        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
-          <div>
-            <p><strong>Kepada Yth:</strong></p>
-            <p>{printData.supplier?.name || '______________________'}</p>
-          </div>
-          <div>
-            <p><strong>Dari (Petugas):</strong></p>
-            <p>{printData.user?.name || '-'}</p>
-          </div>
-        </div>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem' }}>
-          <thead>
-            <tr>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>No</th>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Nama Barang</th>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>Qty</th>
-              <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Keterangan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {printData.items.map((item: any, idx: number) => (
-              <tr key={idx}>
-                <td style={{ border: '1px solid black', padding: '0.5rem' }}>{idx + 1}</td>
-                <td style={{ border: '1px solid black', padding: '0.5rem' }}>{item.product.name} <br/> <small>{item.product.sku}</small></td>
-                <td style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>{item.quantity}</td>
-                <td style={{ border: '1px solid black', padding: '0.5rem' }}>{item.reason}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {printData.notes && (
-          <div style={{ marginBottom: '2rem' }}>
-            <p><strong>Catatan Tambahan:</strong></p>
-            <p style={{ padding: '0.5rem', border: '1px solid black' }}>{printData.notes}</p>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '3rem' }}>
-          <div style={{ textAlign: 'center' }}>
-            <p>Diserahkan Oleh,</p>
-            <br/><br/><br/>
-            <p>(.........................)</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p>Diterima Oleh,</p>
-            <br/><br/><br/>
-            <p>(.........................)</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="card" style={{ display: showForm ? 'none' : 'block' }}>
+      <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📜 Riwayat Retur Barang</h2>
-          <button className="btn btn-success" onClick={() => setShowForm(true)}>➕ Tambah Retur</button>
+          {!showForm && (
+            <button className="btn btn-success" onClick={() => {
+              setCart([]);
+              setSelectedSupplier('');
+              setNotes('');
+              setReturnDate(new Date().toISOString().split('T')[0]);
+              setEditReturnId(null);
+              setShowForm(true);
+            }}>➕ Tambah Retur</button>
+          )}
         </div>
         <div className="table-container">
           <table>
@@ -289,137 +312,202 @@ export default function ReturnPage() {
               </tr>
             </thead>
             <tbody>
-              {history.map((h: any) => (
+              {tableLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <div className="spinner"></div> Memuat data...
+                  </td>
+                </tr>
+              ) : history.map((h: any) => (
                 <tr key={h.id}>
                   <td>{new Date(h.createdAt).toLocaleString('id-ID')}</td>
                   <td>{h.user?.name}</td>
                   <td style={{ fontWeight: 600 }}>{h.supplier?.name || '-'}</td>
                   <td>{h.items.length} Macam</td>
                   <td>
-                    <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => handlePrint(h)}>
-                      🖨️ Cetak Bukti
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleEdit(h)}>
+                        Edit
+                      </button>
+                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
+                        Hapus
+                      </button>
+                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => setPrintData(h)}>
+                        🖨️ Cetak
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {history.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada data retur.</p>}
+          {!tableLoading && history.length === 0 && <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Belum ada data retur.</p>}
         </div>
       </div>
 
       {showForm && (
-        <div className="grid-2">
-          <div className="card" style={{ position: 'relative', zIndex: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 className="card-title" style={{ marginBottom: 0 }}>🔙 Form Input Retur</h2>
-              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setShowForm(false)}>Tutup</button>
+        <div className="modal-overlay">
+          <div className="modal-content large">
+            <div className="modal-header">
+              <h2 className="modal-title">{editReturnId ? '✏️ Edit Retur' : '🔙 Form Input Retur'}</h2>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditReturnId(null); }}>Tutup</button>
             </div>
             
-            <p style={{ color: '#991b1b', background: '#fef2f2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #fecaca' }}>
-              ⚠️ Perhatian: Mencatat retur di sini akan <strong>MENGURANGI STOK</strong> barang di sistem.
-            </p>
-            
-            {scannerMode === 'camera' ? (
-              !scanning && (
-                <button className="btn btn-outline w-full" onClick={startScanner} style={{ padding: '1rem', marginBottom: '1.5rem', fontSize: '1.1rem' }}>
-                  📷 Buka Kamera Scan Barcode
-                </button>
-              )
-            ) : (
-              <div style={{ color: '#166534', background: '#f0fdf4', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1.5rem' }}>
-                🔫 Scanner Alat Aktif! Tembakkan barcode.
-              </div>
-            )}
-
-            {scannerMode === 'camera' && scanning && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <div id="sku-reader-return" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}></div>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Tanggal Retur</label>
-                <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} required />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Penyedia Barang (Tujuan Retur)</label>
-                <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}>
-                  <option value="">-- Pilih Supplier --</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="form-group" style={{ marginBottom: '2rem' }}>
-              <label>Cari Manual (Ketik Nama / SKU)</label>
-              <ProductSearch products={products} onSelect={addToCart} />
-            </div>
-
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Diretur:</h3>
-            
-            {cart.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>Daftar retur kosong.</p>
-            ) : (
-              <div>
-                {cart.map((item, idx) => (
-                  <div key={idx} style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-                    <div style={{ flex: '1 1 200px' }}>
-                      <div style={{ fontWeight: 600 }}>{item.product.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Stok sistem: {item.product.stock}</div>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 300px' }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jml (Qty)</label>
-                        <input type="number" min="1" max={item.product.stock} value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1, item.reason)} style={{ padding: '0.4rem' }} />
-                      </div>
-                      <div style={{ flex: 2 }}>
-                        <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keterangan / Alasan</label>
-                        <input type="text" value={item.reason} onChange={e => updateCartItem(item.product.id, item.quantity, e.target.value)} style={{ padding: '0.4rem' }} placeholder="Rusak, Kemasan Terbuka, dll" />
-                      </div>
-                    </div>
-
-                    <div style={{ flex: '0 0 auto' }}>
-                      <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>❌</button>
-                    </div>
-                  </div>
-                ))}
-                
-                <div className="form-group mt-4">
-                  <label>Catatan Tambahan (Opsional)</label>
-                  <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Tulis catatan retur..." />
+            <div className="modal-body">
+              <p style={{ color: '#991b1b', background: '#fef2f2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #fecaca' }}>
+                ⚠️ Perhatian: Mencatat/mengedit retur di sini akan <strong>MENYESUAIKAN STOK</strong> barang secara otomatis.
+              </p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Tanggal Retur</label>
+                  <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} required />
                 </div>
-
-                <button className="btn w-full mt-4" style={{ background: '#b91c1c' }} onClick={submitReturn} disabled={loading}>
-                  {loading ? 'Menyimpan...' : '✅ Simpan Retur & Kurangi Stok'}
-                </button>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Penyedia Barang (Tujuan Retur)</label>
+                  <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}>
+                    <option value="">-- Pilih Supplier --</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            )}
+
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                {scannerMode === 'camera' ? (
+                  <button className="btn btn-outline w-full" onClick={toggleScanner} style={{ padding: '0.75rem', fontSize: '1rem' }}>
+                    {scanning ? '❌ Tutup Kamera' : '📷 Buka Kamera Scan Barcode'}
+                  </button>
+                ) : (
+                  <div style={{ color: '#166534', background: '#f0fdf4', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1.5rem' }}>
+                    🔫 Scanner Alat Aktif! Tembakkan barcode.
+                  </div>
+                )}
+
+                {scannerMode === 'camera' && scanning && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <div id="sku-reader-return" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}></div>
+                  </div>
+                )}
+                
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Cari Manual (Ketik Nama / SKU)</label>
+                  <ProductSearch products={products} onSelect={addToCart} />
+                </div>
+              </div>
+
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Diretur:</h3>
+              
+              {cart.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>Daftar retur kosong.</p>
+              ) : (
+                <div>
+                  {cart.map((item, idx) => (
+                    <div key={idx} style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+                      <div style={{ flex: '1 1 200px' }}>
+                        <div style={{ fontWeight: 600 }}>{item.product.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Stok sistem saat ini: {item.product.stock}</div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 300px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jml (Qty)</label>
+                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1, item.reason)} style={{ padding: '0.4rem' }} />
+                        </div>
+                        <div style={{ flex: 2 }}>
+                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keterangan / Alasan</label>
+                          <input type="text" value={item.reason} onChange={e => updateCartItem(item.product.id, item.quantity, e.target.value)} style={{ padding: '0.4rem' }} placeholder="Rusak, Kemasan Terbuka, dll" />
+                        </div>
+                      </div>
+
+                      <div style={{ flex: '0 0 auto' }}>
+                        <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>❌</button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <div className="form-group mt-4">
+                    <label>Catatan Tambahan (Opsional)</label>
+                    <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Tulis catatan retur..." />
+                  </div>
+
+                  <button className="btn w-full mt-4" style={{ background: '#b91c1c' }} onClick={submitReturn} disabled={loading}>
+                    {loading ? 'Menyimpan...' : '✅ Simpan Retur'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          
-          <div className="card">
-            <h2 className="card-title">📦 Info Stok Saat Ini</h2>
-            <div className="table-container">
-              <table>
+        </div>
+      )}
+
+      {printData && (
+        <div className="modal-overlay" style={{ zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="print-area" style={{ padding: '2rem', fontFamily: 'monospace', background: 'white', color: 'black' }}>
+              <h1 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>SURAT JALAN RETUR BARANG</h1>
+              <div style={{ textAlign: 'center', borderBottom: '2px dashed black', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                <p>Tanggal: {new Date(printData.createdAt).toLocaleString('id-ID')}</p>
+                <p>ID Retur: {printData.id.slice(-8).toUpperCase()}</p>
+              </div>
+              
+              <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <p><strong>Kepada Yth:</strong></p>
+                  <p>{printData.supplier?.name || '______________________'}</p>
+                </div>
+                <div>
+                  <p><strong>Dari (Petugas):</strong></p>
+                  <p>{printData.user?.name || '-'}</p>
+                </div>
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem' }}>
                 <thead>
                   <tr>
-                    <th>Nama Produk</th>
-                    <th>Sisa Stok</th>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>No</th>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Nama Barang</th>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>Qty</th>
+                    <th style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'left' }}>Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(p => (
-                    <tr key={p.id}>
-                      <td style={{ fontWeight: 600 }}>{p.name}</td>
-                      <td style={{ fontWeight: 600, color: p.stock < 5 ? '#ef4444' : 'inherit' }}>{p.stock}</td>
+                  {printData.items.map((item: any, idx: number) => (
+                    <tr key={idx}>
+                      <td style={{ border: '1px solid black', padding: '0.5rem' }}>{idx + 1}</td>
+                      <td style={{ border: '1px solid black', padding: '0.5rem' }}>{item.productName || item.product?.name}</td>
+                      <td style={{ border: '1px solid black', padding: '0.5rem', textAlign: 'center' }}>{item.quantity}</td>
+                      <td style={{ border: '1px solid black', padding: '0.5rem' }}>{item.reason}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+
+              {printData.notes && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <p><strong>Catatan Tambahan:</strong></p>
+                  <p style={{ padding: '0.5rem', border: '1px solid black' }}>{printData.notes}</p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '3rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p>Diserahkan Oleh,</p>
+                  <br/><br/><br/>
+                  <p>(.........................)</p>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p>Diterima Oleh,</p>
+                  <br/><br/><br/>
+                  <p>(.........................)</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="no-print" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPrintData(null)}>Tutup</button>
+              <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Cetak</button>
             </div>
           </div>
         </div>
