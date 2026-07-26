@@ -32,6 +32,7 @@ export default function ManagerPage() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
+  const [scannerObj, setScannerObj] = useState<Html5Qrcode | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -59,37 +60,49 @@ export default function ManagerPage() {
   };
 
   const startScanner = () => {
-    setScanning(true);
-    setTimeout(() => {
-      const scanner = new Html5QrcodeScanner("sku-reader", { 
-        fps: 15,
-        qrbox: { width: 400, height: 120 },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.CODE_93,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.DATA_MATRIX,
-        ],
-        videoConstraints: selectedCamera 
-          ? { deviceId: { exact: selectedCamera }, facingMode: 'environment' } 
-          : { facingMode: 'environment' }
-      }, false);
-      scanner.render(
-        (decodedText) => {
-          if (editProduct) setEditProduct({ ...editProduct, sku: decodedText });
-          else setForm(prev => ({ ...prev, sku: decodedText }));
-          scanner.clear();
+    if (scanning) {
+      if (scannerObj) {
+        scannerObj.stop().then(() => {
+          scannerObj.clear();
           setScanning(false);
-        },
-        () => {}
-      );
-    }, 100);
+          setScannerObj(null);
+        }).catch(() => {});
+      } else {
+        setScanning(false);
+      }
+    } else {
+      setScanning(true);
+      setTimeout(async () => {
+        try {
+          const scanner = new Html5Qrcode("sku-reader", {
+            verbose: false,
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.CODE_128,
+            ]
+          });
+          setScannerObj(scanner);
+          
+          await scanner.start(
+            selectedCamera ? { deviceId: { exact: selectedCamera } } : { facingMode: 'environment' },
+            { fps: 15, qrbox: { width: 300, height: 100 } },
+            (decodedText) => {
+              if (editProduct) setEditProduct(prev => prev ? { ...prev, sku: decodedText } : prev);
+              else setForm(prev => ({ ...prev, sku: decodedText }));
+              scanner.stop().then(() => {
+                scanner.clear();
+                setScanning(false);
+                setScannerObj(null);
+              }).catch(() => {});
+            },
+            () => {}
+          );
+        } catch (e) {
+          console.error(e);
+          setScanning(false);
+        }
+      }, 100);
+    }
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -231,7 +244,15 @@ export default function ManagerPage() {
           <div className="modal-content">
             <div className="modal-header">
               <h2 className="modal-title">{editProduct ? '✏️ Edit Barang/Jasa' : '➕ Tambah Barang/Jasa Baru'}</h2>
-              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditProduct(null); }}>Tutup</button>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { 
+                setShowForm(false); 
+                setEditProduct(null); 
+                if (scannerObj) {
+                  scannerObj.stop().then(() => { scannerObj.clear(); setScannerObj(null); setScanning(false); }).catch(() => {});
+                } else {
+                  setScanning(false);
+                }
+              }}>Tutup</button>
             </div>
             <div className="modal-body">
               {scannerMode === 'camera' && scanning && (
@@ -259,7 +280,11 @@ export default function ManagerPage() {
                       onChange={e => setEditProduct({...editProduct, sku: e.target.value})} 
                       onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     />
-                    <button type="button" className="btn btn-outline" onClick={startScanner}>📷 Scan</button>
+                    {scannerMode === 'camera' && (
+                      <button type="button" className="btn btn-outline" onClick={startScanner}>
+                        {scanning ? '🛑 Tutup Kamera' : '📷 Kamera'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -302,7 +327,11 @@ export default function ManagerPage() {
                       placeholder="Scan barcode..." 
                       onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     />
-                    <button type="button" className="btn btn-outline" onClick={startScanner}>📷 Scan</button>
+                    {scannerMode === 'camera' && (
+                      <button type="button" className="btn btn-outline" onClick={startScanner}>
+                        {scanning ? '🛑 Tutup Kamera' : '📷 Kamera'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
