@@ -14,7 +14,7 @@ npm install -g pm2
 
 ## 2. Membuat File Konfigurasi (Ecosystem)
 
-Di dalam folder proyek Anda (misalnya `c:\xampp\htdocs\sh\POS2`), buat sebuah file baru bernama `ecosystem.config.js`. 
+Di dalam folder proyek Anda (misalnya `/var/www/html/server/pos1`), buat sebuah file baru bernama `ecosystem.config.js`. 
 
 Salin dan tempel kode berikut ke dalam file tersebut:
 

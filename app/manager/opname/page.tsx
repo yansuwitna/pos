@@ -85,6 +85,7 @@ export default function OpnamePage() {
       setTimeout(async () => {
         try {
           const scanner = new Html5Qrcode("reader", {
+            verbose: false,
             formatsToSupport: [
               Html5QrcodeSupportedFormats.EAN_13,
               Html5QrcodeSupportedFormats.CODE_128,

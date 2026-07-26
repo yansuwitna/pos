@@ -159,7 +159,7 @@ export default function POSPage() {
       setScanning(true);
       setTimeout(async () => {
         try {
-          const scanner = new Html5Qrcode("barcode-reader", { formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128] });
+          const scanner = new Html5Qrcode("barcode-reader", { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.CODE_128] });
           setScannerObj(scanner);
           await scanner.start(
             selectedCamera ? { deviceId: { exact: selectedCamera } } : { facingMode: 'environment' },
