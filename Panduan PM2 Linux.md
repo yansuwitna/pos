@@ -23,23 +23,23 @@ module.exports = {
   apps: [
     // --- APLIKASI PERTAMA ---
     {
-      name   : "POS-App-3009", // Nama aplikasi di PM2
+      name   : "pos1", // Nama aplikasi di PM2
       script : "npm",
       args   : "start",
-      cwd    : "C:/xampp/htdocs/sh/POS2", // Lokasi folder aplikasi pertama
+      cwd    : "/var/www/html/server/pos1", // Lokasi folder aplikasi pertama
       env: {
-        PORT: 3009 // Port untuk aplikasi pertama
+        PORT: 3001 // Port untuk aplikasi pertama
       }
     },
     
     // --- APLIKASI KEDUA ---
     {
-      name   : "POS-App-3008", // Nama aplikasi di PM2 (HARUS BERBEDA)
+      name   : "pos2", // Nama aplikasi di PM2 (HARUS BERBEDA)
       script : "npm",
       args   : "start",
-      cwd    : "C:/xampp/htdocs/sh/POS2", // Ubah jika foldernya berbeda
+      cwd    : "/var/www/html/server/pos2", // Ubah jika foldernya berbeda
       env: {
-        PORT: 3008 // Port untuk aplikasi kedua
+        PORT: 3002 // Port untuk aplikasi kedua
       }
     }
   ]
