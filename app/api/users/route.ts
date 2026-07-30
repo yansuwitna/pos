@@ -86,7 +86,7 @@ export async function PUT(req: Request) {
     const session = await getSession();
     if (!session) return Response.json({ success: false, message: 'Unauthorized' }, { status: 401 });
 
-    const { id, username, name, role, password, isActive } = await req.json();
+    const { id, name, role, password, isActive } = await req.json();
 
     if (id === session.id) {
       if (isActive === false) {
@@ -97,7 +97,7 @@ export async function PUT(req: Request) {
       }
     }
 
-    const data: any = { username, name, role, isActive };
+    const data: any = { name, role, isActive };
     if (password) data.password = password;
 
     const where: any = { id };

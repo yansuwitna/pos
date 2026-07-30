@@ -26,8 +26,18 @@ export async function POST(req: Request) {
       return Response.json({ success: false, message: "Nama dan persen diskon harus diisi" }, { status: 400 });
     }
 
+    let storeId = data.storeId || session?.storeId;
+    if (!storeId) {
+      const fallbackStore = await prisma.store.findFirst();
+      if (!fallbackStore) {
+        return Response.json({ success: false, message: "Toko tidak ditemukan." }, { status: 400 });
+      }
+      storeId = fallbackStore.id;
+    }
+
     const rule = await prisma.discountRule.create({
       data: {
+        storeId,
         name: data.name,
         minItemQuantity: data.minItemQuantity ? Number(data.minItemQuantity) : null,
         minTransaction: data.minTransaction ? Number(data.minTransaction) : null,

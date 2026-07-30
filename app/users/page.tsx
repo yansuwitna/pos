@@ -225,7 +225,8 @@ export default function UsersPage() {
               </div>
               <div className="form-group">
                 <label>Username</label>
-                <input value={editUser.username} onChange={e => setEditUser({...editUser, username: e.target.value})} required />
+                <input value={editUser.username} disabled style={{ cursor: 'not-allowed', opacity: 0.7 }} />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>Username tidak dapat diubah</span>
               </div>
               <div className="form-group">
                 <label>Password Baru (kosongkan jika tidak diubah)</label>

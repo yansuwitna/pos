@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       // 2. Create Payment Record
       const payment = await tx.receivablePayment.create({
         data: {
+          storeId: transaction.storeId,
           transactionId,
           amount: parsedAmount,
           notes,

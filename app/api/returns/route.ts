@@ -36,7 +36,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
-    const { items, supplierId, notes, createdAt } = await req.json();
+    const body = await req.json();
+    const { items, supplierId, notes, createdAt } = body;
 
     if (!items || items.length === 0) {
       return Response.json({ success: false, message: "Daftar retur kosong" }, { status: 400 });
@@ -48,6 +49,17 @@ export async function POST(req: Request) {
       const fallbackUser = await prisma.user.findFirst();
       if (!fallbackUser) return Response.json({ success: false, message: "User tidak ditemukan." }, { status: 400 });
       userId = fallbackUser.id;
+    }
+
+    let storeId = body.storeId || session?.storeId;
+    if (!storeId && userId) {
+      const userObj = await prisma.user.findUnique({ where: { id: userId }, select: { storeId: true } });
+      storeId = userObj?.storeId;
+    }
+    if (!storeId) {
+      const fallbackStore = await prisma.store.findFirst();
+      if (!fallbackStore) return Response.json({ success: false, message: "Toko tidak ditemukan." }, { status: 400 });
+      storeId = fallbackStore.id;
     }
 
     const returnItemsData = items.map((item: any) => ({
@@ -62,6 +74,7 @@ export async function POST(req: Request) {
       // 1. Buat data retur
       const returnDoc = await tx.return.create({
         data: {
+          storeId,
           userId: userId!,
           supplierId: supplierId || null,
           notes: notes,

@@ -36,11 +36,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: 'Tidak ada barang yang di-opname' }, { status: 400 });
     }
 
+    let storeId = body.storeId || session?.storeId;
+    if (!storeId && session?.id) {
+      const userObj = await prisma.user.findUnique({ where: { id: session.id }, select: { storeId: true } });
+      storeId = userObj?.storeId;
+    }
+    if (!storeId) {
+      const fallbackStore = await prisma.store.findFirst();
+      if (!fallbackStore) return NextResponse.json({ success: false, message: 'Toko tidak ditemukan' }, { status: 400 });
+      storeId = fallbackStore.id;
+    }
+
     // Gunakan transaction untuk memastikan opname dan update stock berjalan bersamaan
     const opname = await prisma.$transaction(async (tx) => {
       // 1. Buat record Stok Opname
       const createdOpname = await tx.stockOpname.create({
         data: {
+          storeId,
           userId: session.id,
           notes: notes || '',
           items: {
