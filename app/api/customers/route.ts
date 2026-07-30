@@ -1,10 +1,18 @@
 import { PrismaClient } from '@prisma/client';
+import { getSession } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
+    const session = await getSession();
+    let whereClause: any = {};
+    if (session?.storeId && session.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session.storeId;
+    }
+
     const customers = await prisma.customer.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
     return Response.json({ success: true, customers });
@@ -15,11 +23,27 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const session = await getSession();
     const { name, phone, address } = await req.json();
     if (!name) return Response.json({ success: false, message: "Nama pelanggan wajib diisi" }, { status: 400 });
 
+    let storeId = session?.storeId as string | undefined;
+
+    if (!storeId && session?.id) {
+      const userObj = await prisma.user.findUnique({ where: { id: session.id }, select: { storeId: true } });
+      storeId = userObj?.storeId || undefined;
+    }
+
+    if (!storeId) {
+      const fallbackStore = await prisma.store.findFirst();
+      if (!fallbackStore) {
+        return Response.json({ success: false, message: "Toko tidak ditemukan." }, { status: 400 });
+      }
+      storeId = fallbackStore.id;
+    }
+
     const customer = await prisma.customer.create({
-      data: { name, phone, address }
+      data: { name, phone, address, storeId }
     });
     return Response.json({ success: true, customer });
   } catch (error: any) {

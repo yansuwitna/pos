@@ -5,11 +5,16 @@ const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
+    const session = await getSession();
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
     let whereClause: any = {};
+    if (session?.storeId && session.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session.storeId;
+    }
+
     if (startDate && endDate) {
       whereClause.date = {
         gte: new Date(startDate),
@@ -51,12 +56,27 @@ export async function POST(req: Request) {
       userId = fallbackUser.id;
     }
 
+    let storeId = session?.storeId as string | undefined;
+    if (!storeId && userId) {
+      const userObj = await prisma.user.findUnique({ where: { id: userId }, select: { storeId: true } });
+      storeId = userObj?.storeId || undefined;
+    }
+
+    if (!storeId) {
+      const fallbackStore = await prisma.store.findFirst();
+      if (!fallbackStore) {
+        return Response.json({ success: false, message: "Toko tidak ditemukan." }, { status: 400 });
+      }
+      storeId = fallbackStore.id;
+    }
+
     const capital = await prisma.capital.create({
       data: {
         amount: Number(amount),
         description: description || "Modal Awal",
         date: date ? new Date(date) : new Date(),
-        userId: userId
+        userId: userId,
+        storeId: storeId
       }
     });
 

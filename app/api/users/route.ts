@@ -87,6 +87,16 @@ export async function PUT(req: Request) {
     if (!session) return Response.json({ success: false, message: 'Unauthorized' }, { status: 401 });
 
     const { id, username, name, role, password, isActive } = await req.json();
+
+    if (id === session.id) {
+      if (isActive === false) {
+        return Response.json({ success: false, message: 'Anda tidak dapat menonaktifkan akun Anda sendiri' }, { status: 400 });
+      }
+      if (role && role !== session.role) {
+        return Response.json({ success: false, message: 'Anda tidak dapat mengubah role Anda sendiri' }, { status: 400 });
+      }
+    }
+
     const data: any = { username, name, role, isActive };
     if (password) data.password = password;
 
@@ -121,6 +131,9 @@ export async function DELETE(req: Request) {
     const user = await prisma.user.findUnique({ where });
     if (!user) {
       return Response.json({ success: false, message: 'User tidak ditemukan' }, { status: 404 });
+    }
+    if (id === session.id) {
+      return Response.json({ success: false, message: 'Anda tidak dapat menghapus akun Anda sendiri' }, { status: 400 });
     }
     if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
       return Response.json({ success: false, message: 'Akun ADMIN/SUPER_ADMIN tidak boleh dihapus' }, { status: 403 });

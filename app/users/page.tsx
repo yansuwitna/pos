@@ -247,10 +247,16 @@ export default function UsersPage() {
               </div>
               <div className="form-group">
                 <label>Status Akun</label>
-                <select value={editUser.isActive ? 'true' : 'false'} onChange={e => setEditUser({...editUser, isActive: e.target.value === 'true'})}>
-                  <option value="true">✅ Aktif</option>
-                  <option value="false">🚫 Nonaktif</option>
-                </select>
+                {editUser.id === currentUserId ? (
+                  <div style={{ padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    {editUser.isActive ? '✅ Aktif' : '🚫 Nonaktif'} &nbsp;<em style={{ fontSize: '0.8rem' }}>(Tidak dapat menonaktifkan akun sendiri)</em>
+                  </div>
+                ) : (
+                  <select value={editUser.isActive ? 'true' : 'false'} onChange={e => setEditUser({...editUser, isActive: e.target.value === 'true'})}>
+                    <option value="true">✅ Aktif</option>
+                    <option value="false">🚫 Nonaktif</option>
+                  </select>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button type="submit" className="btn w-full" disabled={loading}>
