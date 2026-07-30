@@ -10,11 +10,24 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { username },
+      include: { store: true },
     });
 
     if (user && user.password === password) {
+      if (!user.isActive) {
+        return Response.json({ success: false, message: "Akun tidak aktif" }, { status: 401 });
+      }
+
       // Create session
-      const sessionData = { id: user.id, username: user.username, role: user.role, name: user.name };
+      const sessionData = { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role, 
+        name: user.name,
+        storeId: user.storeId,
+        storeCode: user.store?.code,
+        storeName: user.store?.name
+      };
       const session = await encrypt(sessionData);
       
       cookies().set('session', session, {

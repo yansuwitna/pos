@@ -13,6 +13,7 @@ const routePermissions: Record<string, string[]> = {
   '/users':    ['ADMIN'],
   '/customers':['ADMIN', 'CASHIER'],
   '/settings': ['ADMIN', 'CASHIER', 'WAREHOUSE'],
+  '/super-admin': ['SUPER_ADMIN'],
 };
 
 // Sort by length descending so more specific routes (like /manager/finances) are checked before /manager
@@ -70,7 +71,7 @@ export async function middleware(request: NextRequest) {
 }
 
 function getRoleHome(role: string): string {
-  // Semua role sekarang punya dashboard
+  if (role === 'SUPER_ADMIN') return '/super-admin';
   return '/dashboard';
 }
 

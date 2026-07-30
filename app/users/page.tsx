@@ -34,6 +34,7 @@ export default function UsersPage() {
   const [msg, setMsg]         = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -41,7 +42,10 @@ export default function UsersPage() {
     setTableLoading(true);
     const res = await fetch('/api/users');
     const data = await res.json();
-    if (data.success) setUsers(data.users);
+    if (data.success) {
+      setUsers(data.users);
+      setCurrentUserId(data.currentUserId ?? null);
+    }
     setTableLoading(false);
   };
 
@@ -229,11 +233,17 @@ export default function UsersPage() {
               </div>
               <div className="form-group">
                 <label>Role / Jabatan</label>
-                <select value={editUser.role} onChange={e => setEditUser({...editUser, role: e.target.value as any})}>
-                  <option value="ADMIN">👑 Admin (Laporan & Manajemen User)</option>
-                  <option value="CASHIER">🛍️ Kasir (Transaksi POS)</option>
-                  <option value="WAREHOUSE">📦 Operator Gudang (Input Barang)</option>
-                </select>
+                {editUser.id === currentUserId ? (
+                  <div style={{ padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    {roleLabels[editUser.role]?.label} &nbsp;<em style={{ fontSize: '0.8rem' }}>(Tidak dapat mengubah role sendiri)</em>
+                  </div>
+                ) : (
+                  <select value={editUser.role} onChange={e => setEditUser({...editUser, role: e.target.value as any})}>
+                    <option value="ADMIN">👑 Admin (Laporan & Manajemen User)</option>
+                    <option value="CASHIER">🛍️ Kasir (Transaksi POS)</option>
+                    <option value="WAREHOUSE">📦 Operator Gudang (Input Barang)</option>
+                  </select>
+                )}
               </div>
               <div className="form-group">
                 <label>Status Akun</label>

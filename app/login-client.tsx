@@ -41,7 +41,7 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
     const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, name, role: 'ADMIN' })
+      body: JSON.stringify({ username, password, name, role: 'SUPER_ADMIN' })
     });
 
     const data = await res.json();
@@ -72,8 +72,8 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
       <div className="container" style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div className="card" style={{ width: "100%", maxWidth: "420px", padding: "2.5rem" }}>
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <h1 className="gradient-text" style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>Setup Awal POSPro</h1>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Sistem belum memiliki Admin. Silakan buat akun Admin pertama Anda.</p>
+            <h1 className="gradient-text" style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>Setup Awal POSPro (Super Admin)</h1>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Sistem belum memiliki Super Admin. Silakan buat akun Super Admin pertama Anda.</p>
           </div>
           
           {error && <div style={{ color: '#ef4444', backgroundColor: '#fef2f2', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500' }}>{error}</div>}
@@ -95,7 +95,7 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
             </div>
             
             <button className="btn w-full mt-4" type="submit" disabled={loading}>
-              {loading ? 'Memproses...' : 'Buat Akun Admin & Masuk'}
+              {loading ? 'Memproses...' : 'Buat Akun Super Admin & Masuk'}
             </button>
           </form>
         </div>
@@ -117,7 +117,10 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Username</label>
-            <input type="text" placeholder="admin" value={username} onChange={e => setUsername(e.target.value)} required />
+            <input type="text" placeholder="cth: TK01_admin" value={username} onChange={e => setUsername(e.target.value)} required />
+            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
+              Format: <strong>KodeToko_Username</strong> (contoh: TK01_admin). Khusus Super Admin, gunakan username Anda.
+            </p>
           </div>
           
           <div className="form-group">
@@ -129,6 +132,9 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
             {loading ? 'Memproses...' : 'Masuk Sekarang'}
           </button>
         </form>
+        <div style={{ textAlign: "center", marginTop: "1rem", fontSize: "0.85rem" }}>
+          <a href="/register" style={{ color: "#2563eb", textDecoration: "underline" }}>Daftar Toko Baru</a>
+        </div>
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export default async function Home() {
   const admin = await prisma.user.findFirst({
-    where: { role: 'ADMIN' }
+    where: { role: 'SUPER_ADMIN' }
   });
 
   return <LoginClient adminExists={!!admin} />;
