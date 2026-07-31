@@ -5,7 +5,14 @@ const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
+    const session = await getSession();
+    let whereClause: any = {};
+    if (session?.storeId && session.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session.storeId;
+    }
+
     const purchases = await prisma.purchase.findMany({
+      where: whereClause,
       include: {
         items: true,
         supplier: { select: { name: true } },
@@ -22,7 +29,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
-    const { items, supplierId, createdAt, amountPaid, dueDate } = await req.json();
+    const body = await req.json();
+    const { items, supplierId, createdAt, amountPaid, dueDate, storeId: reqStoreId } = body;
 
     if (!items || items.length === 0) {
       return Response.json({ success: false, message: "Keranjang kosong" }, { status: 400 });
@@ -38,8 +46,21 @@ export async function POST(req: Request) {
       userId = fallbackUser.id;
     }
 
+    let storeId = reqStoreId || session?.storeId;
+    if (!storeId && userId) {
+      const userObj = await prisma.user.findUnique({ where: { id: userId }, select: { storeId: true } });
+      storeId = userObj?.storeId || undefined;
+    }
+    if (!storeId) {
+      const fallbackStore = await prisma.store.findFirst();
+      if (!fallbackStore) {
+        return Response.json({ success: false, message: "Toko tidak ditemukan." }, { status: 400 });
+      }
+      storeId = fallbackStore.id;
+    }
+
     let totalCost = 0;
-      const purchaseItemsData = items.map((item: any) => {
+    const purchaseItemsData = items.map((item: any) => {
       const subtotal = item.quantity * item.unitCost;
       totalCost += subtotal;
       return {
@@ -68,6 +89,7 @@ export async function POST(req: Request) {
     const purchase = await prisma.$transaction(async (tx) => {
       // 1. Buat Purchase
       const purchaseCreateData: any = {
+        storeId: storeId,
         userId: userId!,
         totalCost: totalCost,
         paymentStatus: paymentStatus as any,

@@ -35,7 +35,7 @@ export async function GET() {
     let totalCost = 0;
 
     transactions.forEach(trx => {
-      totalRevenue += trx.total;
+      totalRevenue += trx.grandTotal;
       trx.items.forEach(item => {
         totalCost += (item.product?.cost || 0) * item.quantity;
       });

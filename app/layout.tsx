@@ -51,6 +51,7 @@ const roleNavLinks: Record<string, { href: string; label: string }[]> = {
   ],
   SUPER_ADMIN: [
     { href: '/super-admin', label: '👑 Super Admin Dashboard' },
+    { href: '/backup',      label: '💾 Backup / Restore' },
   ],
 };
 

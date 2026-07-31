@@ -147,9 +147,9 @@ export default function BackupRestorePage() {
       
       <div className="grid-2">
         <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#0369a1' }}>⬇️ Unduh Backup (Export)</h3>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#0369a1' }}>⬇️ Unduh Backup Toko (Export)</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Simpan semua data (Barang, Kategori, Transaksi, Supplier, Pengguna) ke dalam satu file .json. Disarankan untuk rutin melakukan backup seminggu sekali.
+            Simpan seluruh data toko Anda (Barang, Kategori, Transaksi, Supplier, Pelanggan, User Toko) ke dalam file .json. Disarankan untuk rutin melakukan backup seminggu sekali.
           </p>
           <button 
             className="btn w-full" 
@@ -157,16 +157,16 @@ export default function BackupRestorePage() {
             onClick={handleBackup}
             disabled={loading}
           >
-            {loading ? 'Mengekspor...' : 'Unduh File Backup'}
+            {loading ? 'Mengekspor...' : 'Unduh Backup Toko'}
           </button>
         </div>
 
         <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#b91c1c' }}>⬆️ Pulihkan Data (Restore)</h3>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#b91c1c' }}>⬆️ Pulihkan Data Toko (Restore)</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Kembalikan sistem ke kondisi sebelumnya dengan mengunggah file backup .json. 
+            Kembalikan toko Anda ke kondisi sebelumnya dari file backup .json. 
             <br/><br/>
-            <strong>PERINGATAN:</strong> Semua data saat ini akan terhapus dan ditimpa!
+            <strong>PERINGATAN:</strong> Seluruh data operasional toko ini akan ditimpa dengan data file backup!
           </p>
           <input 
             type="file" 

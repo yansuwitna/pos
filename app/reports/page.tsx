@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 type Transaction = {
   id: string;
   total: number;
+  discount?: number;
+  grandTotal?: number;
   payment: number;
   change: number;
   createdAt: string;
@@ -38,7 +40,7 @@ export default function ReportsPage() {
       .then(data => {
         if (data.success) {
           setTransactions(data.transactions);
-          const revenue = data.transactions.reduce((acc: number, curr: Transaction) => acc + curr.total, 0);
+          const revenue = data.transactions.reduce((acc: number, curr: Transaction) => acc + (curr.grandTotal !== undefined ? curr.grandTotal : curr.total), 0);
           
           // Hitung HPP (Modal) dari barang yang terjual
           let cost = 0;

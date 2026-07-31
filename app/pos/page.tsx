@@ -62,6 +62,9 @@ export default function POSPage() {
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '' });
   const [savingCustomer, setSavingCustomer] = useState(false);
   
+  const [showConfirmTx, setShowConfirmTx] = useState(false);
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
+  
   const [receiptData, setReceiptData] = useState<any>(null);
   const [storeInfo, setStoreInfo] = useState({ name: 'POS Pro', address: '', phone: '', greeting: 'Terima Kasih', logo: '' });
   const [selectedCamera, setSelectedCamera] = useState<string>('');
@@ -202,24 +205,38 @@ export default function POSPage() {
     if ((await Swal.fire({ title: 'Kosongkan?', text: "Yakin?", icon: 'warning', showCancelButton: true })).isConfirmed) setCart([]);
   };
 
-  const processTransaction = async () => {
+  const processTransaction = () => {
     if (cart.length === 0) return Swal.fire('Peringatan', 'Keranjang kosong!', 'warning');
     if (payment === '') return Swal.fire('Peringatan', 'Masukkan nominal uang pembayaran!', 'warning');
     const isCredit = Number(payment) < grandTotal;
     if (isCredit && !selectedCustomer) return Swal.fire('Peringatan', 'Pilih pelanggan terlebih dahulu karena kasbon!', 'warning');
     if (isCredit && !dueDate) return Swal.fire('Peringatan', 'Pilih tanggal jatuh tempo untuk kasbon!', 'warning');
     
+    setShowConfirmTx(true);
+  };
+
+  const executeTransaction = async () => {
+    const isCredit = Number(payment) < grandTotal;
+    setIsSubmittingTx(true);
     try {
       const res = await fetch('/api/transactions', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: cart, payment: Number(payment), discount: Number(discount || 0), customerId: selectedCustomer || undefined, dueDate: isCredit ? dueDate : undefined })
       });
       const data = await res.json();
-      if (!data.success) return Swal.fire('Gagal', "Gagal menyimpan: " + data.message, 'error');
-    } catch(e) { return Swal.fire('Error', "Gagal terhubung ke server.", 'error'); }
-
-    setReceiptData({ items: [...cart], total, discount: Number(discount || 0), grandTotal, payment: Number(payment), change: Number(payment) - grandTotal, date: new Date() });
-    setCart([]); setPayment(''); setDiscount(''); setSelectedCustomer(''); setDueDate('');
+      if (!data.success) {
+        Swal.fire('Gagal', "Gagal menyimpan: " + data.message, 'error');
+        setIsSubmittingTx(false);
+        return;
+      }
+      setReceiptData({ items: [...cart], total, discount: Number(discount || 0), grandTotal, payment: Number(payment), change: Number(payment) - grandTotal, date: new Date() });
+      setCart([]); setPayment(''); setDiscount(''); setSelectedCustomer(''); setDueDate('');
+      setShowConfirmTx(false);
+    } catch(e) { 
+      Swal.fire('Error', "Gagal terhubung ke server.", 'error'); 
+    } finally {
+      setIsSubmittingTx(false);
+    }
   };
 
   const saveNewCustomer = async (e: React.FormEvent) => {
@@ -419,7 +436,7 @@ export default function POSPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>KEMBALI</span><span>{receiptData.change.toLocaleString('id-ID')}</span></div>
                 <p style={{ textAlign: 'center', marginTop: '20px', marginBottom: 0 }}>{storeInfo.greeting}</p>
               </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <div className="no-print" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                 <button style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer', borderRadius: '4px' }} onClick={() => setReceiptData(null)}>Tutup</button>
                 <button id="btn-print-receipt-mobile" style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }} onClick={handlePrint}>Cetak</button>
               </div>
@@ -669,9 +686,58 @@ export default function POSPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>KEMBALI</span><span>{receiptData.change.toLocaleString('id-ID')}</span></div>
               <p style={{ textAlign: 'center', marginTop: '20px', marginBottom: 0 }}>{storeInfo.greeting}</p>
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer', borderRadius: '4px' }} onClick={() => setReceiptData(null)}>Tutup (Esc)</button>
               <button id="btn-print-receipt" style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }} onClick={handlePrint}>🖨️ Cetak (F9)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI PEMBAYARAN */}
+      {showConfirmTx && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '420px', background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', margin: '0 auto 12px auto' }}>🛒</div>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>Konfirmasi Transaksi</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Periksa kembali rincian pembayaran sebelum menyimpan.</p>
+            </div>
+
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', fontSize: '14px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#64748b' }}>Total Belanja:</span>
+                <span style={{ fontWeight: '600', color: '#0f172a' }}>Rp {grandTotal.toLocaleString('id-ID')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#64748b' }}>Uang Pembayaran:</span>
+                <span style={{ fontWeight: '600', color: '#0f172a' }}>Rp {Number(payment).toLocaleString('id-ID')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '4px', fontWeight: 'bold' }}>
+                <span style={{ color: Number(payment) < grandTotal ? '#dc2626' : '#16a34a' }}>
+                  {Number(payment) < grandTotal ? 'Sisa Kasbon (Hutang):' : 'Uang Kembalian:'}
+                </span>
+                <span style={{ color: Number(payment) < grandTotal ? '#dc2626' : '#16a34a', fontSize: '16px' }}>
+                  Rp {Math.abs(Number(payment) - grandTotal).toLocaleString('id-ID')}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                disabled={isSubmittingTx}
+                onClick={() => setShowConfirmTx(false)} 
+                style={{ flex: 1, padding: '12px', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}
+              >
+                Batal
+              </button>
+              <button 
+                disabled={isSubmittingTx}
+                onClick={executeTransaction} 
+                style={{ flex: 1, padding: '12px', border: 'none', background: '#b91c1c', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                {isSubmittingTx ? 'Memproses...' : 'Ya, Simpan'}
+              </button>
             </div>
           </div>
         </div>

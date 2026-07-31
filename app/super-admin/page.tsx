@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Swal from 'sweetalert2';
 
 export default function SuperAdminPage() {
   const [stores, setStores] = useState([]);
@@ -24,6 +25,14 @@ export default function SuperAdminPage() {
   const [clearLoading, setClearLoading] = useState(false);
   const [clearError, setClearError] = useState('');
   const [clearSuccess, setClearSuccess] = useState('');
+
+  // State for deleting store completely
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [storeToDelete, setStoreToDelete] = useState<any>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState('');
 
   useEffect(() => {
     fetchStores();
@@ -136,8 +145,252 @@ export default function SuperAdminPage() {
     }
   };
 
+  const handleOpenDeleteModal = (store: any) => {
+    setStoreToDelete(store);
+    setDeleteConfirmationText('');
+    setDeleteError('');
+    setDeleteSuccess('');
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteConfirmationText !== storeToDelete.code) {
+      setDeleteError(`Teks konfirmasi tidak cocok. Ketik kode toko '${storeToDelete.code}'.`);
+      return;
+    }
+
+    setDeleteError('');
+    setDeleteLoading(true);
+
+    const res = await fetch(`/api/stores/${storeToDelete.id}`, {
+      method: 'DELETE'
+    });
+
+    const data = await res.json();
+    setDeleteLoading(false);
+
+    if (res.ok && data.success) {
+      setDeleteSuccess(data.message);
+      fetchStores();
+      setTimeout(() => {
+        setShowDeleteModal(false);
+        setStoreToDelete(null);
+        setDeleteSuccess('');
+      }, 2000);
+    } else {
+      setDeleteError(data.message || 'Gagal menghapus toko');
+    }
+  };
+
+  // Backup & Restore logic for Super Admin
+  const [backupLoading, setBackupLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBackupSystem = async () => {
+    setBackupLoading(true);
+    try {
+      Swal.fire({
+        title: 'Mengekspor Seluruh Sistem...',
+        text: 'Harap tunggu, sedang menyiapkan file backup seluruh toko.',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      const res = await fetch('/api/backup');
+      const data = await res.json();
+      
+      if (data.success) {
+        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `backup-superadmin-pos-${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        Swal.fire('Berhasil!', 'File backup seluruh sistem berhasil diunduh.', 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal mengekspor database.', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat backup.', 'error');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestoreSystem = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+      return Swal.fire('Format Salah', 'Harap unggah file dengan format .json', 'error');
+    }
+
+    const confirm = await Swal.fire({
+      title: '⚠️ PERINGATAN PEMULIHAN SISTEM ⚠️',
+      html: 'Anda akan memulihkan database dari file backup. <br/><br/><b>Seluruh data seluruh toko saat ini akan DIHAPUS & DITIMPA PERMANEN</b>.<br/><br/>Apakah Anda yakin?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Ya, Timpa Seluruh Database!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    setBackupLoading(true);
+    Swal.fire({
+      title: 'Memulihkan Seluruh Database...',
+      text: 'Harap tunggu, proses ini mungkin memakan waktu. Jangan tutup halaman.',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const fileContent = event.target?.result as string;
+        const backupData = JSON.parse(fileContent);
+
+        const res = await fetch('/api/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupData)
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          Swal.fire('Berhasil!', 'Seluruh sistem berhasil dipulihkan dari backup.', 'success').then(() => {
+            fetchStores();
+          });
+        } else {
+          Swal.fire('Gagal', result.message || 'Gagal memulihkan database.', 'error');
+        }
+      } catch (err) {
+        Swal.fire('Error', 'File backup rusak atau tidak dapat dibaca.', 'error');
+      } finally {
+        setBackupLoading(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Backup specific store
+  const handleBackupStore = async (store: any) => {
+    try {
+      Swal.fire({
+        title: `Mengekspor Toko ${store.name}...`,
+        text: 'Harap tunggu, sedang menyiapkan file backup toko.',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      const res = await fetch(`/api/backup?storeId=${store.id}`);
+      const data = await res.json();
+      
+      if (data.success) {
+        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `backup-toko-${store.code}-${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        Swal.fire('Berhasil!', `File backup toko ${store.name} (${store.code}) berhasil diunduh.`, 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal mengekspor database toko.', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat backup toko.', 'error');
+    }
+  };
+
+  // Restore specific store
+  const [storeToRestore, setStoreToRestore] = useState<any>(null);
+  const storeFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTriggerRestoreStore = (store: any) => {
+    setStoreToRestore(store);
+    if (storeFileInputRef.current) {
+      storeFileInputRef.current.value = '';
+      storeFileInputRef.current.click();
+    }
+  };
+
+  const handleRestoreStoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !storeToRestore) return;
+
+    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+      return Swal.fire('Format Salah', 'Harap unggah file dengan format .json', 'error');
+    }
+
+    const confirm = await Swal.fire({
+      title: `⚠️ PERINGATAN RESTORE TOKO ${storeToRestore.name} (${storeToRestore.code}) ⚠️`,
+      html: `Anda akan memulihkan data untuk toko <b>${storeToRestore.name}</b> dari file backup.<br/><br/><b>Seluruh data operasional toko ini akan DIHAPUS & DITIMPA PERMANEN</b>.<br/>Data toko lain tidak akan terpengaruh.<br/><br/>Apakah Anda yakin?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Ya, Timpa Data Toko Ini!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    Swal.fire({
+      title: `Memulihkan Toko ${storeToRestore.name}...`,
+      text: 'Harap tunggu, proses ini mungkin memakan waktu. Jangan tutup halaman.',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const fileContent = event.target?.result as string;
+        const backupData = JSON.parse(fileContent);
+
+        const res = await fetch(`/api/backup?storeId=${storeToRestore.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupData)
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          Swal.fire('Berhasil!', `Data toko ${storeToRestore.name} (${storeToRestore.code}) berhasil dipulihkan.`, 'success');
+        } else {
+          Swal.fire('Gagal', result.message || 'Gagal memulihkan database toko.', 'error');
+        }
+      } catch (err) {
+        Swal.fire('Error', 'File backup rusak atau tidak dapat dibaca.', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div>
+      <input 
+        type="file" 
+        ref={storeFileInputRef} 
+        onChange={handleRestoreStoreFile} 
+        accept=".json" 
+        style={{ display: 'none' }} 
+      />
+
       <div style={{ marginBottom: "2rem" }}>
         <h1 className="gradient-text" style={{ fontSize: "2rem" }}>Dashboard Super Admin</h1>
         <p style={{ color: "var(--text-muted)" }}>Kelola sistem Multi-Toko dan Pengaturan Global</p>
@@ -182,21 +435,72 @@ export default function SuperAdminPage() {
                     </td>
                     <td>{new Date(store.createdAt).toLocaleDateString()}</td>
                     <td>
-                      <button 
-                        onClick={() => handleOpenClearModal(store)}
-                        style={{
-                          background: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          padding: '0.4rem 0.75rem',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Kosongkan Data
-                      </button>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        <button 
+                          onClick={() => handleBackupStore(store)}
+                          title="Unduh Backup Toko Ini"
+                          style={{
+                            background: '#0284c7',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.4rem 0.6rem',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          💾 Backup
+                        </button>
+                        <button 
+                          onClick={() => handleTriggerRestoreStore(store)}
+                          title="Restore Backup ke Toko Ini"
+                          style={{
+                            background: '#8b5cf6',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.4rem 0.6rem',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          ⬆️ Restore
+                        </button>
+                        <button 
+                          onClick={() => handleOpenClearModal(store)}
+                          title="Kosongkan Data Toko"
+                          style={{
+                            background: '#f59e0b',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.4rem 0.6rem',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Kosongkan
+                        </button>
+                        <button 
+                          onClick={() => handleOpenDeleteModal(store)}
+                          title="Hapus Toko Permanen"
+                          style={{
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.4rem 0.6rem',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          🗑️ Hapus
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -212,19 +516,55 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h2 className="card-title">Pengaturan Sistem</h2>
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <p style={{ marginBottom: '1rem', color: "var(--text-muted)" }}>
-              Apakah publik (siapapun) diizinkan mendaftar toko baru melalui halaman registrasi?
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card">
+            <h2 className="card-title">Pengaturan Sistem</h2>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <p style={{ marginBottom: '1rem', color: "var(--text-muted)" }}>
+                Apakah publik (siapapun) diizinkan mendaftar toko baru melalui halaman registrasi?
+              </p>
+              <button 
+                onClick={togglePublicRegistration}
+                className="btn w-full"
+                style={{ backgroundColor: allowPublic ? 'var(--accent)' : '#ef4444' }}
+              >
+                {allowPublic ? 'Pendaftaran Dibuka (Klik untuk Tutup)' : 'Pendaftaran Ditutup (Klik untuk Buka)'}
+              </button>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="card-title">💾 Backup & Restore Database System</h2>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
+              Ekspor seluruh database (seluruh toko, transaksi, produk, dan pengaturan global) atau pulihkan dari file JSON backup.
             </p>
-            <button 
-              onClick={togglePublicRegistration}
-              className="btn w-full"
-              style={{ backgroundColor: allowPublic ? 'var(--accent)' : '#ef4444' }}
-            >
-              {allowPublic ? 'Pendaftaran Dibuka (Klik untuk Tutup)' : 'Pendaftaran Ditutup (Klik untuk Buka)'}
-            </button>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <button 
+                onClick={handleBackupSystem}
+                disabled={backupLoading}
+                className="btn btn-success"
+                style={{ width: '100%', padding: '0.75rem' }}
+              >
+                ⬇️ Unduh Full Backup System (.json)
+              </button>
+
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleRestoreSystem} 
+                accept=".json" 
+                style={{ display: 'none' }} 
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={backupLoading}
+                className="btn"
+                style={{ width: '100%', padding: '0.75rem', backgroundColor: '#dc2626' }}
+              >
+                ⬆️ Pulihkan System dari File Backup
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -358,6 +698,73 @@ export default function SuperAdminPage() {
                 disabled={clearLoading || clearConfirmationText !== 'KOSONGKAN'}
               >
                 {clearLoading ? 'Menghapus...' : 'Ya, Kosongkan Data!'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hapus Toko Permanen */}
+      {showDeleteModal && storeToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ color: '#dc2626' }}>🗑️ Hapus Toko Permanen</h3>
+              <button 
+                onClick={() => setShowDeleteModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              {deleteError && <div style={{ color: '#ef4444', backgroundColor: '#fef2f2', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500' }}>{deleteError}</div>}
+              {deleteSuccess && <div style={{ color: '#166534', backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500' }}>{deleteSuccess}</div>}
+
+              <p style={{ marginBottom: '1rem' }}>
+                Anda akan menghapus toko <strong>{storeToDelete.name} ({storeToDelete.code})</strong> beserta <strong>SELURUH AKUN USER DAN DATANYA</strong> secara permanen dari sistem.
+              </p>
+              <ul style={{ marginLeft: '1.5rem', marginBottom: '1rem', color: '#dc2626', fontSize: '0.9rem' }}>
+                <li>Seluruh Akun User/Manajer/Kasir Toko Ini</li>
+                <li>Seluruh Produk, Kategori, Supplier, dan Pelanggan</li>
+                <li>Seluruh Transaksi Penjualan, Pembelian, Hutang & Piutang</li>
+                <li>Profil Toko itu Sendiri</li>
+              </ul>
+              <p style={{ marginBottom: '1rem', color: '#ef4444', fontWeight: 'bold' }}>
+                Tindakan ini TIDAK DAPAT DIBATALKAN.
+              </p>
+
+              <form id="deleteStoreForm" onSubmit={handleDeleteStore}>
+                <div className="form-group">
+                  <label>Ketik kode toko <strong>{storeToDelete.code}</strong> untuk mengonfirmasi:</label>
+                  <input 
+                    type="text" 
+                    placeholder={storeToDelete.code} 
+                    value={deleteConfirmationText} 
+                    onChange={e => setDeleteConfirmationText(e.target.value.toUpperCase())} 
+                    required 
+                    autoComplete="off"
+                  />
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+              >
+                Batal
+              </button>
+              <button 
+                type="submit" 
+                form="deleteStoreForm"
+                className="btn" 
+                style={{ backgroundColor: '#dc2626' }}
+                disabled={deleteLoading || deleteConfirmationText !== storeToDelete.code}
+              >
+                {deleteLoading ? 'Menghapus...' : 'Ya, Hapus Toko Permanen'}
               </button>
             </div>
           </div>
