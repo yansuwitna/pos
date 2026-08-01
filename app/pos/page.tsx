@@ -4,7 +4,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import Swal from 'sweetalert2';
 import ProductSearch from '@/app/components/ProductSearch';
 
-type Product = { id: string; sku: string | null; name: string; price: number; discountPercent?: number; cost: number; stock: number; };
+type Product = { id: string; sku: string | null; name: string; type?: 'GOODS' | 'SERVICE'; price: number; discountPercent?: number; cost: number; stock: number; };
 type DiscountRule = { id: string; name: string; minItemQuantity: number | null; minTransaction: number | null; discountPercent: number; isActive: boolean; };
 type Customer = { id: string; name: string; phone: string | null; };
 type CartItem = Product & { quantity: number; subtotal: number };
