@@ -11,7 +11,16 @@ export async function GET() {
 
   try {
     const stores = await prisma.store.findMany({
-      orderBy: { createdAt: 'desc' }
+      include: {
+        _count: {
+          select: {
+            users: true,
+            products: true,
+            transactions: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
     return Response.json({ success: true, stores });
   } catch (error) {

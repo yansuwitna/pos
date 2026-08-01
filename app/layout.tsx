@@ -28,7 +28,6 @@ const roleNavLinks: Record<string, { href: string; label: string }[]> = {
     { href: '/customers', label: '👥 Daftar Pelanggan' },
     { href: '/users',     label: '👥 Manajemen User' },
     { href: '/reports',   label: '📊 Laporan Penjualan' },
-    { href: '/backup',    label: '💾 Backup / Restore' },
     { href: '/settings',  label: '⚙️ Pengaturan' },
   ],
   CASHIER: [
@@ -51,7 +50,6 @@ const roleNavLinks: Record<string, { href: string; label: string }[]> = {
   ],
   SUPER_ADMIN: [
     { href: '/super-admin', label: '👑 Super Admin Dashboard' },
-    { href: '/backup',      label: '💾 Backup / Restore' },
   ],
 };
 

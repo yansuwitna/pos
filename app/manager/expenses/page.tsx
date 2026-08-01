@@ -179,7 +179,7 @@ export default function ExpensesPage() {
                 </div>
                 <div className="form-group">
                   <label>Nominal (Rp)</label>
-                  <input type="number" min="0" placeholder="0" value={amount} onChange={e => setAmount(e.target.value)} required />
+                  <input type="number" min="0" placeholder="0" value={amount} onChange={e => setAmount(e.target.value)} onFocus={e => e.target.select()} required />
                 </div>
                 <div className="form-group">
                   <label>Keterangan Tambahan</label>

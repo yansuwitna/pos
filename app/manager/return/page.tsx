@@ -158,12 +158,10 @@ export default function ReturnPage() {
     }
   };
 
-  const updateCartItem = (productId: string, quantity: number, reason: string) => {
+  const updateCartItem = (productId: string, quantity: number | string, reason: string) => {
     setCart(cart.map(item => {
       if (item.product.id === productId) {
-        // limit quantity if not editing past data, but here we'll let them adjust manually. 
-        // In real app, might want to limit to stock for new returns.
-        return { ...item, quantity: Math.max(1, quantity), reason };
+        return { ...item, quantity: quantity as any, reason };
       }
       return item;
     }));
@@ -414,7 +412,7 @@ export default function ReturnPage() {
                       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 300px' }}>
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jml (Qty)</label>
-                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1, item.reason)} style={{ padding: '0.4rem' }} />
+                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1), item.reason)} onFocus={e => e.target.select()} style={{ padding: '0.4rem' }} />
                         </div>
                         <div style={{ flex: 2 }}>
                           <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keterangan / Alasan</label>

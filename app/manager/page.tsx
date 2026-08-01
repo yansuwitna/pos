@@ -291,16 +291,16 @@ export default function ManagerPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Harga Modal</label>
-                  <input type="number" min="0" value={editProduct.cost} onChange={e => setEditProduct({...editProduct, cost: parseInt(e.target.value) || 0})} required />
+                  <input type="number" min="0" value={editProduct.cost} onChange={e => setEditProduct({...editProduct, cost: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} onFocus={e => e.target.select()} required />
                 </div>
                 <div className="form-group">
                   <label>Harga Jual</label>
-                  <input type="number" min="0" value={editProduct.price} onChange={e => setEditProduct({...editProduct, price: parseInt(e.target.value) || 0})} required />
+                  <input type="number" min="0" value={editProduct.price} onChange={e => setEditProduct({...editProduct, price: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} onFocus={e => e.target.select()} required />
                 </div>
               </div>
               <div className="form-group">
                 <label>Diskon (%)</label>
-                <input type="number" min="0" max="100" value={editProduct.discountPercent || 0} onChange={e => setEditProduct({...editProduct, discountPercent: parseInt(e.target.value) || 0})} />
+                <input type="number" min="0" max="100" value={editProduct.discountPercent} onChange={e => setEditProduct({...editProduct, discountPercent: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} onFocus={e => e.target.select()} />
               </div>
               <button type="submit" className="btn w-full" disabled={loading}>{loading ? 'Menyimpan...' : '💾 Simpan Perubahan'}</button>
             </form>
@@ -338,16 +338,16 @@ export default function ManagerPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Harga Modal</label>
-                  <input type="number" min="0" value={form.cost} onChange={e => setForm({...form, cost: parseInt(e.target.value) || 0})} required />
+                  <input type="number" min="0" value={form.cost} onChange={e => setForm({...form, cost: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} onFocus={e => e.target.select()} required />
                 </div>
                 <div className="form-group">
                   <label>Harga Jual</label>
-                  <input type="number" min="0" value={form.price} onChange={e => setForm({...form, price: parseInt(e.target.value) || 0})} required />
+                  <input type="number" min="0" value={form.price} onChange={e => setForm({...form, price: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} onFocus={e => e.target.select()} required />
                 </div>
               </div>
               <div className="form-group">
                 <label>Diskon (%)</label>
-                <input type="number" min="0" max="100" value={form.discountPercent || 0} onChange={e => setForm({...form, discountPercent: parseInt(e.target.value) || 0})} />
+                <input type="number" min="0" max="100" value={form.discountPercent} onChange={e => setForm({...form, discountPercent: e.target.value === '' ? '' : (parseInt(e.target.value) || 0)})} onFocus={e => e.target.select()} />
               </div>
               <button type="submit" className="btn w-full" disabled={loading}>{loading ? 'Menyimpan...' : '➕ Tambah Barang/Jasa'}</button>
             </form>

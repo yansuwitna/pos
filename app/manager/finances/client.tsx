@@ -247,7 +247,7 @@ export default function FinancesClient({ role }: { role: string }) {
               <form onSubmit={submitPayment}>
                 <div className="form-group">
                   <label>Nominal Pembayaran (Rp)</label>
-                  <input type="number" min="1" max={(activeTab === 'receivables' ? selectedDoc.grandTotal : selectedDoc.totalCost) - selectedDoc.amountPaid} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} required />
+                  <input type="number" min="1" max={(activeTab === 'receivables' ? selectedDoc.grandTotal : selectedDoc.totalCost) - selectedDoc.amountPaid} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} onFocus={e => e.target.select()} required />
                 </div>
                 <div className="form-group">
                   <label>Keterangan Tambahan (Opsional)</label>

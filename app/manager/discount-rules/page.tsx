@@ -195,6 +195,7 @@ export default function DiscountRulesPage() {
                   type="number" 
                   value={form.minItemQuantity} 
                   onChange={e => setForm({...form, minItemQuantity: e.target.value})} 
+                  onFocus={e => e.target.select()}
                   placeholder="Misal: 30" 
                 />
               </div>
@@ -204,6 +205,7 @@ export default function DiscountRulesPage() {
                   type="number" 
                   value={form.minTransaction} 
                   onChange={e => setForm({...form, minTransaction: e.target.value})} 
+                  onFocus={e => e.target.select()}
                   placeholder="Misal: 1000000" 
                 />
               </div>
@@ -214,6 +216,7 @@ export default function DiscountRulesPage() {
                   step="0.01"
                   value={form.discountPercent} 
                   onChange={e => setForm({...form, discountPercent: e.target.value})} 
+                  onFocus={e => e.target.select()}
                   placeholder="Misal: 5" 
                   required 
                 />

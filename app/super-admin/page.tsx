@@ -411,6 +411,9 @@ export default function SuperAdminPage() {
                 <tr>
                   <th>Kode</th>
                   <th>Nama Toko</th>
+                  <th style={{ textAlign: 'center' }}>User</th>
+                  <th style={{ textAlign: 'center' }}>Barang</th>
+                  <th style={{ textAlign: 'center' }}>Transaksi</th>
                   <th>Status</th>
                   <th>Tanggal Dibuat</th>
                   <th>Aksi</th>
@@ -421,6 +424,42 @@ export default function SuperAdminPage() {
                   <tr key={store.id}>
                     <td><strong>{store.code}</strong></td>
                     <td>{store.name}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{ 
+                        padding: '2px 8px', 
+                        borderRadius: '12px', 
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        backgroundColor: '#eff6ff',
+                        color: '#1d4ed8'
+                      }}>
+                        {store._count?.users ?? 0}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{ 
+                        padding: '2px 8px', 
+                        borderRadius: '12px', 
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        backgroundColor: '#fef3c7',
+                        color: '#d97706'
+                      }}>
+                        {store._count?.products ?? 0}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{ 
+                        padding: '2px 8px', 
+                        borderRadius: '12px', 
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        backgroundColor: '#dcfce7',
+                        color: '#15803d'
+                      }}>
+                        {store._count?.transactions ?? 0}
+                      </span>
+                    </td>
                     <td>
                       <span style={{ 
                         padding: '4px 8px', 
@@ -506,7 +545,7 @@ export default function SuperAdminPage() {
                 ))}
                 {stores.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                    <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>
                       Belum ada toko yang terdaftar.
                     </td>
                   </tr>

@@ -80,6 +80,7 @@ export default function CapitalPage() {
               min="0"
               value={amount}
               onChange={e => setAmount(e.target.value)}
+              onFocus={e => e.target.select()}
               placeholder="Contoh: 10000000"
               required
             />

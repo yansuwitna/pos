@@ -160,10 +160,14 @@ export default function PurchasePage() {
     }
   };
 
-  const updateCartItem = (productId: string, quantity: number, unitCost: number) => {
+  const updateCartItem = (productId: string, quantity: number | string, unitCost: number | string) => {
     setCart(cart.map(item => {
       if (item.product.id === productId) {
-        return { ...item, quantity: Math.max(1, quantity), unitCost: Math.max(0, unitCost) };
+        return { 
+          ...item, 
+          quantity: quantity as any, 
+          unitCost: unitCost as any 
+        };
       }
       return item;
     }));
@@ -417,11 +421,11 @@ export default function PurchasePage() {
                       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 200px' }}>
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tambahan Qty</label>
-                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1, item.unitCost)} style={{ padding: '0.4rem' }} />
+                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1), item.unitCost)} onFocus={e => e.target.select()} style={{ padding: '0.4rem' }} />
                         </div>
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Harga Beli (Rp)</label>
-                          <input type="number" min="0" value={item.unitCost} onChange={e => updateCartItem(item.product.id, item.quantity, parseInt(e.target.value)||0)} style={{ padding: '0.4rem' }} />
+                          <input type="number" min="0" value={item.unitCost} onChange={e => updateCartItem(item.product.id, item.quantity, e.target.value === '' ? '' : (parseInt(e.target.value) || 0))} onFocus={e => e.target.select()} style={{ padding: '0.4rem' }} />
                         </div>
                       </div>
 
@@ -439,7 +443,7 @@ export default function PurchasePage() {
                   <div style={{ padding: '1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '1.5rem' }}>
                     <div className="form-group" style={{ marginBottom: '1rem' }}>
                       <label>Nominal Pembayaran Ke Supplier (Biarkan kosong jika lunas / Rp {cartTotal.toLocaleString('id-ID')})</label>
-                      <input type="number" placeholder={cartTotal.toString()} value={amountPaid} onChange={e => setAmountPaid(e.target.value)} />
+                      <input type="number" placeholder={cartTotal.toString()} value={amountPaid} onChange={e => setAmountPaid(e.target.value)} onFocus={e => e.target.select()} />
                     </div>
                     {amountPaid !== '' && Number(amountPaid) < cartTotal && (
                       <div className="form-group" style={{ marginBottom: 0 }}>

@@ -136,10 +136,10 @@ export default function OrderPage() {
     }
   };
 
-  const updateCartItem = (productId: string, quantity: number) => {
+  const updateCartItem = (productId: string, quantity: number | string) => {
     setCart(cart.map(item => {
       if (item.product.id === productId) {
-        return { ...item, quantity: Math.max(1, quantity) };
+        return { ...item, quantity: quantity as any };
       }
       return item;
     }));
@@ -414,7 +414,7 @@ export default function OrderPage() {
                         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 100px' }}>
                           <div style={{ flex: 1 }}>
                             <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jumlah (Qty)</label>
-                            <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, parseInt(e.target.value)||1)} style={{ padding: '0.4rem' }} />
+                            <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1))} onFocus={e => e.target.select()} style={{ padding: '0.4rem' }} />
                           </div>
                         </div>
 

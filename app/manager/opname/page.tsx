@@ -149,10 +149,11 @@ export default function OpnamePage() {
     : [];
 
   const updateActualStock = (index: number, newActual: string) => {
-    const act = parseInt(newActual) || 0;
+    const act = newActual === '' ? ('' as any) : (parseInt(newActual) || 0);
+    const numAct = Number(act) || 0;
     const newItems = [...items];
     newItems[index].actualStock = act;
-    newItems[index].difference = act - newItems[index].systemStock;
+    newItems[index].difference = numAct - newItems[index].systemStock;
     setItems(newItems);
   };
 
@@ -363,6 +364,7 @@ export default function OpnamePage() {
                             min="0"
                             value={item.actualStock}
                             onChange={(e) => updateActualStock(i, e.target.value)}
+                            onFocus={e => e.target.select()}
                             style={{ width: '100%', padding: '0.4rem', border: '2px solid var(--primary)', borderRadius: '6px', textAlign: 'center', fontWeight: 'bold' }}
                           />
                         </td>

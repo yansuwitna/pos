@@ -196,8 +196,12 @@ export default function POSPage() {
     });
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    setCart(prev => prev.map(item => item.id === productId ? { ...item, quantity: Math.max(1, quantity), subtotal: calcSubtotal(item.price, Math.max(1, quantity), item.discountPercent) } : item));
+  const updateQuantity = (productId: string, quantity: number | string) => {
+    setCart(prev => prev.map(item => item.id === productId ? { 
+      ...item, 
+      quantity: quantity as any, 
+      subtotal: calcSubtotal(item.price, Math.max(1, Number(quantity) || 1), item.discountPercent) 
+    } : item));
   };
 
   const removeItem = (productId: string) => setCart(prev => prev.filter(item => item.id !== productId));
@@ -359,7 +363,7 @@ export default function POSPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       Rp {item.price.toLocaleString('id-ID')} x 
-                      <input type="number" value={item.quantity} onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)} style={{ width: '50px', padding: '4px', textAlign: 'center', border: '1px solid #ccc', borderRadius: '4px' }} min="1" />
+                      <input type="number" value={item.quantity} onChange={(e) => updateQuantity(item.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1))} onFocus={e => e.target.select()} style={{ width: '50px', padding: '4px', textAlign: 'center', border: '1px solid #ccc', borderRadius: '4px' }} min="1" />
                     </div>
                     <div style={{ fontWeight: 'bold' }}>Rp {item.subtotal.toLocaleString('id-ID')}</div>
                   </div>
@@ -387,7 +391,7 @@ export default function POSPage() {
           </div>
           
           <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-             <input type="number" placeholder="Uang Bayar" value={payment} onChange={e => setPayment(e.target.value)} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '2px solid #cbd5e1', borderRadius: '6px', textAlign: 'right' }} />
+             <input type="number" placeholder="Uang Bayar" value={payment} onChange={e => setPayment(e.target.value)} onFocus={e => e.target.select()} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '2px solid #cbd5e1', borderRadius: '6px', textAlign: 'right' }} />
              <button onClick={processTransaction} style={{ background: '#b91c1c', color: '#fff', border: 'none', padding: '10px 20px', fontSize: '16px', fontWeight: 'bold', borderRadius: '6px' }}>BAYAR</button>
           </div>
         </div>
@@ -560,7 +564,7 @@ export default function POSPage() {
                     <td style={{ padding: '12px', borderRight: '1px solid #e2e8f0' }}>{item.sku || '-'}</td>
                     <td style={{ padding: '12px', borderRight: '1px solid #e2e8f0', fontWeight: 'bold' }}>{item.name}</td>
                     <td style={{ padding: '12px', borderRight: '1px solid #e2e8f0', textAlign: 'center' }}>
-                      <input type="number" min="1" value={item.quantity} onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 1)} style={{ width: '60px', textAlign: 'center', border: '1px solid #ccc', padding: '4px' }} />
+                      <input type="number" min="1" value={item.quantity} onChange={e => updateQuantity(item.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1))} onFocus={e => e.target.select()} style={{ width: '60px', textAlign: 'center', border: '1px solid #ccc', padding: '4px' }} />
                     </td>
                     <td style={{ padding: '12px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{item.price.toLocaleString('id-ID')}</td>
                     <td style={{ padding: '12px', borderRight: '1px solid #e2e8f0', textAlign: 'right', color: item.discountPercent && item.discountPercent > 0 ? '#ef4444' : 'inherit' }}>{item.discountPercent || 0}%</td>
@@ -635,7 +639,7 @@ export default function POSPage() {
         <div style={{ display: 'flex', alignItems: 'stretch', gap: '20px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>UANG BAYAR (F4)</label>
-             <input id="payment-input" type="number" value={payment} onChange={e => setPayment(e.target.value)} style={{ padding: '12px', fontSize: '20px', width: '200px', border: '2px solid #ccc', borderRadius: '4px', textAlign: 'right', fontWeight: 'bold' }} placeholder="0" />
+             <input id="payment-input" type="number" value={payment} onChange={e => setPayment(e.target.value)} onFocus={e => e.target.select()} style={{ padding: '12px', fontSize: '20px', width: '200px', border: '2px solid #ccc', borderRadius: '4px', textAlign: 'right', fontWeight: 'bold' }} placeholder="0" />
           </div>
           <button id="btn-pay" onClick={processTransaction} style={{ background: '#b91c1c', color: '#fff', border: 'none', padding: '0 40px', fontSize: '22px', fontWeight: 'bold', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px rgba(185, 28, 28, 0.3)' }}>
             🛒 BAYAR (F12)
