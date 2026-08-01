@@ -10,6 +10,9 @@ type Product = {
   cost: number;
   stock: number;
   discountPercent?: number;
+  totalBought?: number;
+  totalReturned?: number;
+  totalSold?: number;
 };
 
 export default function AdminProductsPage() {
@@ -54,19 +57,45 @@ export default function AdminProductsPage() {
               <th>Harga Modal</th>
               <th>Harga Jual</th>
               <th>Diskon (%)</th>
-              <th>Sisa Stok</th>
+              <th style={{ textAlign: 'center' }}>Jml Beli</th>
+              <th style={{ textAlign: 'center' }}>Jml Return</th>
+              <th style={{ textAlign: 'center' }}>Jml Jual</th>
+              <th style={{ textAlign: 'center' }}>Sisa Stok</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(p => (
+            {filtered.map((p: any) => (
               <tr key={p.id}>
                 <td style={{ color: 'var(--text-muted)' }}>{p.sku || '-'}</td>
                 <td style={{ fontWeight: 600 }}>{p.name}</td>
                 <td>Rp {p.cost.toLocaleString('id-ID')}</td>
                 <td>Rp {p.price.toLocaleString('id-ID')}</td>
                 <td style={{ color: p.discountPercent && p.discountPercent > 0 ? '#b91c1c' : 'inherit' }}>{p.discountPercent || 0}%</td>
-                <td style={{ fontWeight: 600, color: p.stock < 5 ? '#ef4444' : 'inherit' }}>
-                  {p.type === 'GOODS' ? p.stock : '-'}
+                <td style={{ textAlign: 'center' }}>
+                  {p.type === 'GOODS' ? (
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#e0f2fe', color: '#0369a1' }}>
+                      {p.totalBought ?? 0}
+                    </span>
+                  ) : '-'}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {p.type === 'GOODS' ? (
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#fef3c7', color: '#b45309' }}>
+                      {p.totalReturned ?? 0}
+                    </span>
+                  ) : '-'}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#f3e8ff', color: '#6b21a8' }}>
+                    {p.totalSold ?? 0}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {p.type === 'GOODS' ? (
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: p.stock < 5 ? '#fee2e2' : '#dcfce7', color: p.stock < 5 ? '#991b1b' : '#166534' }}>
+                      {p.stock}
+                    </span>
+                  ) : '-'}
                 </td>
               </tr>
             ))}

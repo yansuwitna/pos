@@ -214,7 +214,12 @@ export default function POSPage() {
     if (payment === '') return Swal.fire('Peringatan', 'Masukkan nominal uang pembayaran!', 'warning');
     const isCredit = Number(payment) < grandTotal;
     if (isCredit && !selectedCustomer) return Swal.fire('Peringatan', 'Pilih pelanggan terlebih dahulu karena kasbon!', 'warning');
-    if (isCredit && !dueDate) return Swal.fire('Peringatan', 'Pilih tanggal jatuh tempo untuk kasbon!', 'warning');
+    
+    // Auto fill default due date (+7 hari) if isCredit and dueDate is not set yet
+    if (isCredit && !dueDate) {
+      const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      setDueDate(defaultDate);
+    }
     
     setShowConfirmTx(true);
   };
@@ -330,6 +335,17 @@ export default function POSPage() {
              <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Pelanggan:</div>
              <SearchableSelect options={customers} value={selectedCustomer} onChange={setSelectedCustomer} placeholder="-- Umum --" />
           </div>
+          {(selectedCustomer || (payment !== '' && Number(payment) < grandTotal)) && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff5f5', padding: '6px 10px', borderRadius: '4px', border: '1px solid #fecaca' }}>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#b91c1c' }}>📅 Jatuh Tempo Kasbon:</div>
+              <input 
+                type="date" 
+                value={dueDate} 
+                onChange={e => setDueDate(e.target.value)} 
+                style={{ padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} 
+              />
+            </div>
+          )}
           {discountRules.length > 0 && (
              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                {discountRules.map(rule => (
@@ -592,6 +608,18 @@ export default function POSPage() {
             <div style={{ fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>👤 MEMBER</div>
             <SearchableSelect options={customers} value={selectedCustomer} onChange={setSelectedCustomer} placeholder="-- Umum --" />
             <button onClick={() => setShowAddCustomer(true)} style={{ padding: '6px', fontSize: '11px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}>+ Pelanggan Baru</button>
+            
+            {(selectedCustomer || (payment !== '' && Number(payment) < grandTotal)) && (
+              <div style={{ marginTop: '4px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1' }}>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#b91c1c', display: 'block', marginBottom: '4px' }}>📅 Jatuh Tempo Kasbon:</label>
+                <input 
+                  type="date" 
+                  value={dueDate} 
+                  onChange={e => setDueDate(e.target.value)} 
+                  style={{ width: '100%', padding: '6px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} 
+                />
+              </div>
+            )}
           </div>
           
 
@@ -725,6 +753,19 @@ export default function POSPage() {
                   Rp {Math.abs(Number(payment) - grandTotal).toLocaleString('id-ID')}
                 </span>
               </div>
+
+              {Number(payment) < grandTotal && (
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #cbd5e1' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#dc2626', marginBottom: '4px' }}>📅 Tanggal Jatuh Tempo Kasbon:</label>
+                  <input 
+                    type="date" 
+                    value={dueDate} 
+                    onChange={e => setDueDate(e.target.value)} 
+                    style={{ width: '100%', padding: '8px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px' }} 
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>

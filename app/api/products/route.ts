@@ -15,6 +15,10 @@ export async function GET() {
     const products = await prisma.product.findMany({
       where,
       include: {
+        category: true,
+        purchaseItems: { select: { quantity: true } },
+        returnItems: { select: { quantity: true } },
+        transactionItems: { select: { quantity: true } },
         _count: {
           select: {
             transactionItems: true,
@@ -23,9 +27,25 @@ export async function GET() {
             orderItems: true
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     });
-    return Response.json({ success: true, products });
+
+    const formattedProducts = products.map(p => {
+      const totalBought = p.purchaseItems.reduce((sum, item) => sum + item.quantity, 0);
+      const totalReturned = p.returnItems.reduce((sum, item) => sum + item.quantity, 0);
+      const totalSold = p.transactionItems.reduce((sum, item) => sum + item.quantity, 0);
+
+      const { purchaseItems, returnItems, transactionItems, ...rest } = p;
+      return {
+        ...rest,
+        totalBought,
+        totalReturned,
+        totalSold
+      };
+    });
+
+    return Response.json({ success: true, products: formattedProducts });
   } catch (error) {
     return Response.json({ success: false, message: "Gagal mengambil data produk" }, { status: 500 });
   }

@@ -522,7 +522,7 @@ export default function PurchasePage() {
                   <p style={{ textDecoration: 'underline' }}>{printData.user?.name || 'Admin Gudang'}</p>
                 </div>
                 <div>
-                  <p style={{ marginBottom: '4rem' }}>Penerima / Supplier,</p>
+                  <p style={{ marginBottom: '4rem' }}>Pihak Supplier / Pengirim,</p>
                   <p>_______________________</p>
                 </div>
               </div>
