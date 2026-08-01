@@ -34,8 +34,15 @@ export default function ManagerPage() {
   const [tableLoading, setTableLoading] = useState(true);
   const [scannerObj, setScannerObj] = useState<Html5Qrcode | null>(null);
 
+  const [storeInfo, setStoreInfo] = useState<any>(null);
+
   useEffect(() => {
     fetchProducts();
+    fetch('/api/settings/store')
+      .then(res => res.json())
+      .then(data => { if (data.success) setStoreInfo(data.storeInfo); })
+      .catch(() => {});
+
     // Baca kamera yang sudah dikonfigurasi Admin di halaman Pengaturan
     const savedCam = localStorage.getItem('pos_camera_id');
     if (savedCam) setSelectedCamera(savedCam);

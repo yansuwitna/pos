@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -52,6 +50,14 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       await tx.category.deleteMany({ where: { storeId } });
       await tx.customer.deleteMany({ where: { storeId } });
       await tx.supplier.deleteMany({ where: { storeId } });
+
+      // 5. Delete Non-Manager Users (role != ADMIN) for this store
+      await tx.user.deleteMany({
+        where: {
+          storeId,
+          role: { not: 'ADMIN' }
+        }
+      });
     }, {
       maxWait: 10000, // 10 seconds max wait for transaction
       timeout: 20000  // 20 seconds timeout since deleting a lot of data might take time

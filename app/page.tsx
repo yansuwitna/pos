@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import LoginClient from './login-client';
-
-const prisma = new PrismaClient();
 
 export default async function Home() {
   const admin = await prisma.user.findFirst({

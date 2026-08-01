@@ -1,25 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
 type Props = {
   role: string;
   name: string;
+  storeName?: string;
   links: { href: string; label: string }[];
   children: React.ReactNode;
 };
 
 const roleLabels: Record<string, string> = {
-  ADMIN:     '👑 Admin',
+  ADMIN:     '👑 Manager',
   CASHIER:   '🛍️ Kasir',
   WAREHOUSE: '📦 Gudang',
 };
 
-export default function LayoutWrapper({ role, name, links, children }: Props) {
+export default function LayoutWrapper({ role, name, storeName: initialStoreName, links, children }: Props) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Untuk Desktop
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false); // Untuk Mobile
   const pathname = usePathname();
+
+  const [storeInfo, setStoreInfo] = useState<{ name?: string; logo?: string } | null>(
+    initialStoreName ? { name: initialStoreName } : null
+  );
+
+  useEffect(() => {
+    fetch('/api/settings/store')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.storeInfo) {
+          setStoreInfo(data.storeInfo);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Find current page title
   const currentLink = links.find(l => l.href === pathname);
@@ -38,6 +54,7 @@ export default function LayoutWrapper({ role, name, links, children }: Props) {
           POS<span>Pro</span>
           <button className="mobile-close-btn" onClick={() => setSidebarMobileOpen(false)}>✖</button>
         </div>
+
         <nav className="sidebar-nav">
           {links.map(link => (
             <a 
@@ -68,6 +85,29 @@ export default function LayoutWrapper({ role, name, links, children }: Props) {
           
           <div className="navbar-right">
             <div className="nav-user">
+              {/* STORE NAME BADGE IN TOP NAVBAR */}
+              {storeInfo?.name && (
+                <div 
+                  className="nav-store-badge" 
+                  title={`Toko: ${storeInfo.name}`}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    background: 'rgba(239, 68, 68, 0.1)', 
+                    color: '#ef4444', 
+                    border: '1px solid rgba(239, 68, 68, 0.25)', 
+                    padding: '4px 10px', 
+                    borderRadius: '20px', 
+                    fontSize: '0.85rem', 
+                    fontWeight: 'bold' 
+                  }}
+                >
+                  <span>🏪</span>
+                  <span>{storeInfo.name}</span>
+                </div>
+              )}
+
               <span className="nav-role-badge">{roleLabels[role] ?? role}</span>
               <span className="nav-username">{name}</span>
               <a href="/api/auth/logout" className="nav-btn-logout">🚪 Keluar</a>

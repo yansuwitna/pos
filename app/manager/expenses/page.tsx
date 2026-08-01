@@ -183,7 +183,26 @@ export default function ExpensesPage() {
                 </div>
                 <div className="form-group">
                   <label>Keterangan Tambahan</label>
-                  <textarea placeholder="Contoh: Bayar listrik bulan juli..." value={description} onChange={e => setDescription(e.target.value)}></textarea>
+                  <textarea 
+                    placeholder="Contoh: Bayar listrik bulan juli..." 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)}
+                    rows={3}
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.75rem 1rem', 
+                      borderRadius: '10px', 
+                      border: '1px solid var(--border)', 
+                      fontFamily: 'inherit', 
+                      fontSize: '0.95rem',
+                      resize: 'vertical',
+                      minHeight: '80px',
+                      outline: 'none',
+                      backgroundColor: 'var(--bg-card, #ffffff)',
+                      color: 'var(--text-main, #1e293b)',
+                      transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+                    }}
+                  />
                 </div>
                 <button type="submit" className="btn btn-primary w-full" disabled={loading}>
                   {loading ? 'Menyimpan...' : 'Simpan Pengeluaran'}

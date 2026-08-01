@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'rahasia-banget';
 
 export async function GET() {
   try {
+    const session = await getSession();
+    let whereClause: any = {};
+    if (session?.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session?.storeId;
+    }
+
     const opnames = await prisma.stockOpname.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { name: true } },

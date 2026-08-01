@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Swal from 'sweetalert2';
 
 type Props = {
   adminExists: boolean;
@@ -9,6 +10,7 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
   const [adminExists, setAdminExists] = useState(initialAdminExists);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState(''); // for admin creation
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,7 +31,14 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
     if (data.success) {
       window.location.href = '/dashboard';
     } else {
-      setError(data.message);
+      const errMsg = data.message || 'Username dan Password salah';
+      setError(errMsg);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Masuk!',
+        text: errMsg,
+        confirmButtonColor: '#ef4444'
+      });
     }
   };
 
@@ -91,7 +100,33 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
             
             <div className="form-group">
               <label>Password</label>
-              <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  placeholder="••••••••" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  required 
+                  style={{ width: '100%', paddingRight: '45px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '1.1rem',
+                    color: 'var(--text-muted)',
+                    padding: '4px'
+                  }}
+                  title={showPassword ? 'Sembunyikan Password' : 'Tampilkan Password'}
+                >
+                  {showPassword ? '👁️' : '🙈'}
+                </button>
+              </div>
             </div>
             
             <button className="btn w-full mt-4" type="submit" disabled={loading}>
@@ -125,7 +160,33 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
           
           <div className="form-group">
             <label>Password</label>
-            <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                placeholder="••••••••" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
+                style={{ width: '100%', paddingRight: '45px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  color: 'var(--text-muted)',
+                  padding: '4px'
+                }}
+                title={showPassword ? 'Sembunyikan Password' : 'Tampilkan Password'}
+              >
+                {showPassword ? '👁️' : '🙈'}
+              </button>
+            </div>
           </div>
           
           <button className="btn w-full mt-4" type="submit" disabled={loading}>

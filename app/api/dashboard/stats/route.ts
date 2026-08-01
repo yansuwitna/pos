@@ -1,18 +1,30 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const session = await getSession();
+    if (!session) {
+      return Response.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    let whereStore: any = {};
+    if (session.role !== 'SUPER_ADMIN' && session.storeId) {
+      whereStore = { storeId: session.storeId };
+    }
+
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // 1. Jumlah Barang (Seluruhnya)
-    const productCount = await prisma.product.count();
+    // 1. Jumlah Barang (Seluruhnya untuk toko ini)
+    const productCount = await prisma.product.count({
+      where: whereStore
+    });
 
-    // 2. Jumlah Transaksi Bulan Ini
+    // 2. Jumlah Transaksi Bulan Ini (Toko ini)
     const transactions = await prisma.transaction.findMany({
       where: {
+        ...whereStore,
         createdAt: {
           gte: firstDayOfMonth
         }
@@ -41,9 +53,10 @@ export async function GET() {
       });
     });
 
-    // 4. Biaya Operasional Bulan Ini
+    // 4. Biaya Operasional Bulan Ini (Toko ini)
     const expenses = await prisma.expense.findMany({
       where: {
+        ...whereStore,
         date: {
           gte: firstDayOfMonth
         }
@@ -55,17 +68,19 @@ export async function GET() {
     const grossProfit = totalRevenue - totalCost;
     const netProfit = grossProfit - totalExpense;
 
-    // 5. Total Hutang (Seluruh Sisa Hutang yang Belum Lunas)
+    // 5. Total Hutang (Seluruh Sisa Hutang yang Belum Lunas Milik Toko Ini)
     const unpaidPurchases = await prisma.purchase.findMany({
       where: {
+        ...whereStore,
         paymentStatus: { in: ['UNPAID', 'PARTIAL'] }
       }
     });
     const totalDebt = unpaidPurchases.reduce((acc, curr) => acc + (curr.totalCost - curr.amountPaid), 0);
 
-    // 6. Total Piutang (Seluruh Sisa Piutang yang Belum Lunas)
+    // 6. Total Piutang (Seluruh Sisa Piutang yang Belum Lunas Milik Toko Ini)
     const unpaidTransactions = await prisma.transaction.findMany({
       where: {
+        ...whereStore,
         paymentStatus: { in: ['UNPAID', 'PARTIAL'] }
       }
     });

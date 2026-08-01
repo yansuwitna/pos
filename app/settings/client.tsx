@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import Swal from 'sweetalert2';
 
@@ -7,6 +7,10 @@ type Props = { role: string };
 
 export default function SettingsClient({ role }: Props) {
   const isAdmin = role === 'ADMIN';
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
 
   const [printerStatus, setPrinterStatus]   = useState('Belum Terhubung');
   const [cameras, setCameras]               = useState<{ id: string; label: string }[]>([]);
@@ -50,12 +54,20 @@ export default function SettingsClient({ role }: Props) {
 
     if (!isAdmin) return;
     
-    // Store Info is Admin Only
-    const savedStore = localStorage.getItem('pos_store_info');
-    if (savedStore) {
-      try { setStoreInfo(JSON.parse(savedStore)); } catch(e){}
-    }
+    // Store Info is Admin Only - fetch from API
+    fetchStoreInfo();
   }, [isAdmin]);
+
+  const fetchStoreInfo = async () => {
+    try {
+      const res = await fetch('/api/settings/store');
+      const data = await res.json();
+      if (data.success && data.storeInfo) {
+        setStoreInfo(data.storeInfo);
+        localStorage.setItem('pos_store_info', JSON.stringify(data.storeInfo));
+      }
+    } catch (e) {}
+  };
 
   const saveCamera = () => {
     localStorage.setItem('pos_camera_id', selectedCamera);
@@ -63,10 +75,25 @@ export default function SettingsClient({ role }: Props) {
     setTimeout(() => setCameraSaved(false), 2500);
   };
 
-  const saveStoreInfo = () => {
-    localStorage.setItem('pos_store_info', JSON.stringify(storeInfo));
-    setStoreSaved(true);
-    setTimeout(() => setStoreSaved(false), 2500);
+  const saveStoreInfo = async () => {
+    try {
+      const res = await fetch('/api/settings/store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storeInfo)
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('pos_store_info', JSON.stringify(storeInfo));
+        setStoreSaved(true);
+        setTimeout(() => setStoreSaved(false), 2500);
+        Swal.fire('Berhasil!', 'Profil Toko berhasil disimpan ke database!', 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal menyimpan profil toko', 'error');
+      }
+    } catch (e) {
+      Swal.fire('Error', 'Gagal menyimpan profil toko', 'error');
+    }
   };
 
   const saveScannerMode = (mode: string) => {
@@ -136,6 +163,90 @@ export default function SettingsClient({ role }: Props) {
       console.error(err);
       Swal.fire('Gagal', 'Gagal mengirim perintah. Pastikan Bluetooth aktif dan printer didukung.', 'error');
     }
+  };
+
+  const handleBackupData = async () => {
+    setBackupLoading(true);
+    try {
+      const res = await fetch('/api/backup');
+      const data = await res.json();
+      setBackupLoading(false);
+      if (data.success) {
+        const jsonStr = JSON.stringify(data.data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const storeNameSlug = data.data?.store?.code || 'toko';
+        a.download = `backup_${storeNameSlug}_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Swal.fire('Berhasil!', 'File backup toko berhasil diunduh.', 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal membuat backup toko.', 'error');
+      }
+    } catch (err) {
+      setBackupLoading(false);
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat mendownload backup.', 'error');
+    }
+  };
+
+  const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const confirm = await Swal.fire({
+      title: 'Konfirmasi Restore Data Toko',
+      text: 'PERINGATAN: Memulihkan file backup akan menggantikan data toko Anda saat ini dengan data dari file backup. Apakah Anda yakin?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#8b5cf6',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Ya, Pulihkan Sekarang!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    Swal.fire({
+      title: 'Memulihkan Data Toko...',
+      text: 'Harap tunggu, proses ini sedang memulihkan data toko Anda.',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    setRestoreLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const fileContent = event.target?.result as string;
+        const backupData = JSON.parse(fileContent);
+
+        const res = await fetch('/api/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupData)
+        });
+
+        const result = await res.json();
+        setRestoreLoading(false);
+        if (result.success) {
+          Swal.fire('Berhasil!', 'Data toko Anda berhasil dipulihkan dari file backup.', 'success').then(() => {
+            window.location.reload();
+          });
+        } else {
+          Swal.fire('Gagal', result.message || 'Gagal memulihkan database toko.', 'error');
+        }
+      } catch (err) {
+        setRestoreLoading(false);
+        Swal.fire('Error', 'File backup rusak atau tidak dapat dibaca.', 'error');
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -321,6 +432,43 @@ export default function SettingsClient({ role }: Props) {
         </a>
       </div>
       
+      {/* === BACKUP & RESTORE DATA TOKO (Hanya Admin/Manager) === */}
+      {isAdmin && (
+        <div className="card" style={{ marginTop: '1.5rem' }}>
+          <h2 className="card-title">💾 Backup & Restore Data Toko</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+            Unduh salinan cadangan data toko Anda (Barang, Kategori, Transaksi, Keuangan, Kasir & Gudang) atau pulihkan data dari file backup JSON.
+          </p>
+
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleRestoreFile} 
+            accept=".json" 
+            style={{ display: 'none' }} 
+          />
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0.8rem' }}
+              onClick={handleBackupData}
+              disabled={backupLoading}
+            >
+              💾 {backupLoading ? 'Mengunduh...' : 'Unduh Backup Toko'}
+            </button>
+            <button 
+              className="btn" 
+              style={{ flex: 1, minWidth: '180px', background: '#8b5cf6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0.8rem' }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={restoreLoading}
+            >
+              ⬆️ {restoreLoading ? 'Memproses...' : 'Restore File Backup'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* === DANGER ZONE (Hanya Admin) === */}
       {isAdmin && (
         <div className="card" style={{ marginTop: '3rem', border: '2px solid #ef4444' }}>

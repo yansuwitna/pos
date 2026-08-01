@@ -1,15 +1,18 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
+    const session = await getSession();
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     
     let whereClause: any = {};
+    if (session?.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session?.storeId;
+    }
+
     if (startDate && endDate) {
       whereClause.createdAt = {
         gte: new Date(startDate),

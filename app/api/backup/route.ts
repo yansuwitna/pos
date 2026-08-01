@@ -1,7 +1,22 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 
-const prisma = new PrismaClient();
+// Helper untuk mengubah string ISO Date kembali ke Javascript Date Object secara otomatis
+function formatBackupDates(items: any[] | undefined) {
+  if (!items || !Array.isArray(items)) return [];
+  return items.map(item => {
+    const newItem = { ...item };
+    for (const key of Object.keys(newItem)) {
+      if ((key.endsWith('At') || key === 'date') && typeof newItem[key] === 'string') {
+        const parsedDate = new Date(newItem[key]);
+        if (!isNaN(parsedDate.getTime())) {
+          newItem[key] = parsedDate;
+        }
+      }
+    }
+    return newItem;
+  });
+}
 
 // Fungsi EXPORT (Backup)
 export async function GET(req: Request) {
@@ -20,12 +35,12 @@ export async function GET(req: Request) {
       targetStoreId = session?.storeId;
     }
 
-    // Jika storeId ditentukan (restore/backup khusus toko tertentu):
+    // Jika storeId ditentukan (backup khusus toko tertentu):
     if (targetStoreId) {
       const storeObj = await prisma.store.findUnique({ where: { id: targetStoreId } });
       const data: any = {
         store: storeObj,
-        users: await prisma.user.findMany({ where: { storeId: targetStoreId } }),
+        users: await prisma.user.findMany({ where: { storeId: targetStoreId, role: { not: 'ADMIN' } } }),
         categories: await prisma.category.findMany({ where: { storeId: targetStoreId } }),
         products: await prisma.product.findMany({ where: { storeId: targetStoreId } }),
         suppliers: await prisma.supplier.findMany({ where: { storeId: targetStoreId } }),
@@ -50,7 +65,7 @@ export async function GET(req: Request) {
       return Response.json({ success: true, data });
     }
 
-    // Full system export for Super Admin when no storeId param is passed
+    // Full system export untuk Super Admin jika tanpa parameter storeId
     const data: any = {
       stores: await prisma.store.findMany(),
       systemSettings: await prisma.systemSetting.findMany(),
@@ -94,10 +109,16 @@ export async function POST(req: Request) {
     const { searchParams } = new URL(req.url);
     const requestedStoreId = searchParams.get('storeId');
 
-    const backupData = await req.json();
+    let payload = await req.json();
 
-    // Pastikan ini adalah file backup yang valid dengan mengecek keberadaan kunci (keys) utama
-    if (!backupData || (!backupData.products && !backupData.categories && !backupData.transactions)) {
+    // Dukung struktur JSON langsung maupun yang terbungkus { success: true, data: {...} }
+    if (payload && payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+      payload = payload.data;
+    }
+    const backupData = payload;
+
+    // Validasi struktur utama file backup
+    if (!backupData || (!backupData.products && !backupData.categories && !backupData.transactions && !backupData.stores)) {
       return Response.json({ success: false, message: "File backup tidak valid atau rusak." }, { status: 400 });
     }
 
@@ -118,12 +139,35 @@ export async function POST(req: Request) {
       }
     }
 
+    if (targetStoreId) {
+      const currentStore = await prisma.store.findUnique({ where: { id: targetStoreId } });
+      
+      // Validasi Isolasi Toko: File backup Toko 1 TIDAK BISA digunakan untuk Toko 2!
+      const backupStoreId = backupData.store?.id || backupData.storeId;
+      const backupStoreCode = backupData.store?.code || backupData.storeCode;
+      const backupStoreName = backupData.store?.name || backupData.storeName;
+
+      if (backupStoreId && backupStoreId !== targetStoreId) {
+        return Response.json({
+          success: false,
+          message: `Gagal Restore: File backup ini milik "${backupStoreName || backupStoreCode || 'Toko Lain'}" (${backupStoreCode || ''}), tidak dapat digunakan pada "${currentStore?.name}" (${currentStore?.code}).`
+        }, { status: 400 });
+      }
+
+      if (backupStoreCode && currentStore?.code && backupStoreCode !== currentStore.code) {
+        return Response.json({
+          success: false,
+          message: `Gagal Restore: Kode toko pada file backup (${backupStoreCode}) tidak cocok dengan toko ini (${currentStore.code}).`
+        }, { status: 400 });
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       if (targetStoreId) {
         // --- RESTORE PER TOKO (STORE ISOLATION) ---
         const storeId = targetStoreId;
 
-        // 1. Delete existing data for this store only
+        // 1. Hapus data lama khusus toko ini (urutan child -> parent)
         await tx.transactionItem.deleteMany({ where: { transaction: { storeId } } });
         await tx.purchaseItem.deleteMany({ where: { purchase: { storeId } } });
         await tx.returnItem.deleteMany({ where: { return: { storeId } } });
@@ -146,41 +190,67 @@ export async function POST(req: Request) {
         await tx.category.deleteMany({ where: { storeId } });
         await tx.customer.deleteMany({ where: { storeId } });
         await tx.supplier.deleteMany({ where: { storeId } });
-        await tx.user.deleteMany({ where: { storeId, id: { not: session.id } } });
+        await tx.user.deleteMany({ where: { storeId, role: { notIn: ['ADMIN', 'SUPER_ADMIN'] } } });
 
-        // 2. Helper to assign storeId
-        const ensureStore = (items: any[]) => items?.map(item => ({ ...item, storeId })) || [];
+        // 2. Helper assign storeId & konversi Tanggal
+        const prepareData = (items: any[]) => formatBackupDates(items?.map(item => ({ ...item, storeId })));
 
-        if (backupData.categories?.length > 0) await tx.category.createMany({ data: ensureStore(backupData.categories), skipDuplicates: true });
-        if (backupData.suppliers?.length > 0) await tx.supplier.createMany({ data: ensureStore(backupData.suppliers), skipDuplicates: true });
-        if (backupData.customers?.length > 0) await tx.customer.createMany({ data: ensureStore(backupData.customers), skipDuplicates: true });
-        if (backupData.products?.length > 0) await tx.product.createMany({ data: ensureStore(backupData.products), skipDuplicates: true });
+        const categories = prepareData(backupData.categories);
+        const suppliers = prepareData(backupData.suppliers);
+        const customers = prepareData(backupData.customers);
+        const products = prepareData(backupData.products);
+
+        if (categories.length > 0) await tx.category.createMany({ data: categories, skipDuplicates: true });
+        if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers, skipDuplicates: true });
+        if (customers.length > 0) await tx.customer.createMany({ data: customers, skipDuplicates: true });
+        if (products.length > 0) await tx.product.createMany({ data: products, skipDuplicates: true });
 
         if (backupData.users?.length > 0) {
-          const usersToInsert = ensureStore(backupData.users).filter((u: any) => u.id !== session.id);
+          const usersToInsert = prepareData(backupData.users).filter((u: any) => u.role !== 'ADMIN' && u.role !== 'SUPER_ADMIN');
           if (usersToInsert.length > 0) await tx.user.createMany({ data: usersToInsert, skipDuplicates: true });
         }
 
-        if (backupData.transactions?.length > 0) await tx.transaction.createMany({ data: ensureStore(backupData.transactions), skipDuplicates: true });
-        if (backupData.transactionItems?.length > 0) await tx.transactionItem.createMany({ data: backupData.transactionItems, skipDuplicates: true });
-        if (backupData.receivablePayments?.length > 0) await tx.receivablePayment.createMany({ data: ensureStore(backupData.receivablePayments), skipDuplicates: true });
+        const transactions = prepareData(backupData.transactions);
+        const transactionItems = formatBackupDates(backupData.transactionItems);
+        const receivablePayments = prepareData(backupData.receivablePayments);
 
-        if (backupData.purchases?.length > 0) await tx.purchase.createMany({ data: ensureStore(backupData.purchases), skipDuplicates: true });
-        if (backupData.purchaseItems?.length > 0) await tx.purchaseItem.createMany({ data: backupData.purchaseItems, skipDuplicates: true });
-        if (backupData.debtPayments?.length > 0) await tx.debtPayment.createMany({ data: ensureStore(backupData.debtPayments), skipDuplicates: true });
+        if (transactions.length > 0) await tx.transaction.createMany({ data: transactions, skipDuplicates: true });
+        if (transactionItems.length > 0) await tx.transactionItem.createMany({ data: transactionItems, skipDuplicates: true });
+        if (receivablePayments.length > 0) await tx.receivablePayment.createMany({ data: receivablePayments, skipDuplicates: true });
 
-        if (backupData.returns?.length > 0) await tx.return.createMany({ data: ensureStore(backupData.returns), skipDuplicates: true });
-        if (backupData.returnItems?.length > 0) await tx.returnItem.createMany({ data: backupData.returnItems, skipDuplicates: true });
+        const purchases = prepareData(backupData.purchases);
+        const purchaseItems = formatBackupDates(backupData.purchaseItems);
+        const debtPayments = prepareData(backupData.debtPayments);
 
-        if (backupData.orders?.length > 0) await tx.order.createMany({ data: ensureStore(backupData.orders), skipDuplicates: true });
-        if (backupData.orderItems?.length > 0) await tx.orderItem.createMany({ data: backupData.orderItems, skipDuplicates: true });
+        if (purchases.length > 0) await tx.purchase.createMany({ data: purchases, skipDuplicates: true });
+        if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems, skipDuplicates: true });
+        if (debtPayments.length > 0) await tx.debtPayment.createMany({ data: debtPayments, skipDuplicates: true });
 
-        if (backupData.stockOpnames?.length > 0) await tx.stockOpname.createMany({ data: ensureStore(backupData.stockOpnames), skipDuplicates: true });
-        if (backupData.stockOpnameItems?.length > 0) await tx.stockOpnameItem.createMany({ data: backupData.stockOpnameItems, skipDuplicates: true });
+        const returns = prepareData(backupData.returns);
+        const returnItems = formatBackupDates(backupData.returnItems);
 
-        if (backupData.expenses?.length > 0) await tx.expense.createMany({ data: ensureStore(backupData.expenses), skipDuplicates: true });
-        if (backupData.discountRules?.length > 0) await tx.discountRule.createMany({ data: ensureStore(backupData.discountRules), skipDuplicates: true });
-        if (backupData.capitals?.length > 0) await tx.capital.createMany({ data: ensureStore(backupData.capitals), skipDuplicates: true });
+        if (returns.length > 0) await tx.return.createMany({ data: returns, skipDuplicates: true });
+        if (returnItems.length > 0) await tx.returnItem.createMany({ data: returnItems, skipDuplicates: true });
+
+        const orders = prepareData(backupData.orders);
+        const orderItems = formatBackupDates(backupData.orderItems);
+
+        if (orders.length > 0) await tx.order.createMany({ data: orders, skipDuplicates: true });
+        if (orderItems.length > 0) await tx.orderItem.createMany({ data: orderItems, skipDuplicates: true });
+
+        const stockOpnames = prepareData(backupData.stockOpnames);
+        const stockOpnameItems = formatBackupDates(backupData.stockOpnameItems);
+
+        if (stockOpnames.length > 0) await tx.stockOpname.createMany({ data: stockOpnames, skipDuplicates: true });
+        if (stockOpnameItems.length > 0) await tx.stockOpnameItem.createMany({ data: stockOpnameItems, skipDuplicates: true });
+
+        const expenses = prepareData(backupData.expenses);
+        const discountRules = prepareData(backupData.discountRules);
+        const capitals = prepareData(backupData.capitals);
+
+        if (expenses.length > 0) await tx.expense.createMany({ data: expenses, skipDuplicates: true });
+        if (discountRules.length > 0) await tx.discountRule.createMany({ data: discountRules, skipDuplicates: true });
+        if (capitals.length > 0) await tx.capital.createMany({ data: capitals, skipDuplicates: true });
       } else {
         // --- RESTORE SUPER ADMIN (FULL SYSTEM WIPE & RESTORE) ---
         await tx.transactionItem.deleteMany();
@@ -210,38 +280,67 @@ export async function POST(req: Request) {
         await tx.user.deleteMany();
         await tx.store.deleteMany();
 
-        if (backupData.stores?.length > 0) await tx.store.createMany({ data: backupData.stores, skipDuplicates: true });
-        if (backupData.systemSettings?.length > 0) await tx.systemSetting.createMany({ data: backupData.systemSettings, skipDuplicates: true });
-        if (backupData.users?.length > 0) await tx.user.createMany({ data: backupData.users, skipDuplicates: true });
-        if (backupData.categories?.length > 0) await tx.category.createMany({ data: backupData.categories, skipDuplicates: true });
-        if (backupData.suppliers?.length > 0) await tx.supplier.createMany({ data: backupData.suppliers, skipDuplicates: true });
-        if (backupData.customers?.length > 0) await tx.customer.createMany({ data: backupData.customers, skipDuplicates: true });
-        if (backupData.products?.length > 0) await tx.product.createMany({ data: backupData.products, skipDuplicates: true });
+        const stores = formatBackupDates(backupData.stores);
+        const systemSettings = formatBackupDates(backupData.systemSettings);
+        const users = formatBackupDates(backupData.users);
+        const categories = formatBackupDates(backupData.categories);
+        const suppliers = formatBackupDates(backupData.suppliers);
+        const customers = formatBackupDates(backupData.customers);
+        const products = formatBackupDates(backupData.products);
 
-        if (backupData.transactions?.length > 0) await tx.transaction.createMany({ data: backupData.transactions, skipDuplicates: true });
-        if (backupData.transactionItems?.length > 0) await tx.transactionItem.createMany({ data: backupData.transactionItems, skipDuplicates: true });
-        if (backupData.receivablePayments?.length > 0) await tx.receivablePayment.createMany({ data: ensureStore(backupData.receivablePayments), skipDuplicates: true });
+        if (stores.length > 0) await tx.store.createMany({ data: stores, skipDuplicates: true });
+        if (systemSettings.length > 0) await tx.systemSetting.createMany({ data: systemSettings, skipDuplicates: true });
+        if (users.length > 0) await tx.user.createMany({ data: users, skipDuplicates: true });
+        if (categories.length > 0) await tx.category.createMany({ data: categories, skipDuplicates: true });
+        if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers, skipDuplicates: true });
+        if (customers.length > 0) await tx.customer.createMany({ data: customers, skipDuplicates: true });
+        if (products.length > 0) await tx.product.createMany({ data: products, skipDuplicates: true });
 
-        if (backupData.purchases?.length > 0) await tx.purchase.createMany({ data: backupData.purchases, skipDuplicates: true });
-        if (backupData.purchaseItems?.length > 0) await tx.purchaseItem.createMany({ data: backupData.purchaseItems, skipDuplicates: true });
-        if (backupData.debtPayments?.length > 0) await tx.debtPayment.createMany({ data: backupData.debtPayments, skipDuplicates: true });
+        const transactions = formatBackupDates(backupData.transactions);
+        const transactionItems = formatBackupDates(backupData.transactionItems);
+        const receivablePayments = formatBackupDates(backupData.receivablePayments);
 
-        if (backupData.returns?.length > 0) await tx.return.createMany({ data: backupData.returns, skipDuplicates: true });
-        if (backupData.returnItems?.length > 0) await tx.returnItem.createMany({ data: backupData.returnItems, skipDuplicates: true });
+        if (transactions.length > 0) await tx.transaction.createMany({ data: transactions, skipDuplicates: true });
+        if (transactionItems.length > 0) await tx.transactionItem.createMany({ data: transactionItems, skipDuplicates: true });
+        if (receivablePayments.length > 0) await tx.receivablePayment.createMany({ data: receivablePayments, skipDuplicates: true });
 
-        if (backupData.orders?.length > 0) await tx.order.createMany({ data: backupData.orders, skipDuplicates: true });
-        if (backupData.orderItems?.length > 0) await tx.orderItem.createMany({ data: backupData.orderItems, skipDuplicates: true });
+        const purchases = formatBackupDates(backupData.purchases);
+        const purchaseItems = formatBackupDates(backupData.purchaseItems);
+        const debtPayments = formatBackupDates(backupData.debtPayments);
 
-        if (backupData.stockOpnames?.length > 0) await tx.stockOpname.createMany({ data: backupData.stockOpnames, skipDuplicates: true });
-        if (backupData.stockOpnameItems?.length > 0) await tx.stockOpnameItem.createMany({ data: backupData.stockOpnameItems, skipDuplicates: true });
+        if (purchases.length > 0) await tx.purchase.createMany({ data: purchases, skipDuplicates: true });
+        if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems, skipDuplicates: true });
+        if (debtPayments.length > 0) await tx.debtPayment.createMany({ data: debtPayments, skipDuplicates: true });
 
-        if (backupData.expenses?.length > 0) await tx.expense.createMany({ data: backupData.expenses, skipDuplicates: true });
-        if (backupData.discountRules?.length > 0) await tx.discountRule.createMany({ data: backupData.discountRules, skipDuplicates: true });
-        if (backupData.capitals?.length > 0) await tx.capital.createMany({ data: backupData.capitals, skipDuplicates: true });
+        const returns = formatBackupDates(backupData.returns);
+        const returnItems = formatBackupDates(backupData.returnItems);
+
+        if (returns.length > 0) await tx.return.createMany({ data: returns, skipDuplicates: true });
+        if (returnItems.length > 0) await tx.returnItem.createMany({ data: returnItems, skipDuplicates: true });
+
+        const orders = formatBackupDates(backupData.orders);
+        const orderItems = formatBackupDates(backupData.orderItems);
+
+        if (orders.length > 0) await tx.order.createMany({ data: orders, skipDuplicates: true });
+        if (orderItems.length > 0) await tx.orderItem.createMany({ data: orderItems, skipDuplicates: true });
+
+        const stockOpnames = formatBackupDates(backupData.stockOpnames);
+        const stockOpnameItems = formatBackupDates(backupData.stockOpnameItems);
+
+        if (stockOpnames.length > 0) await tx.stockOpname.createMany({ data: stockOpnames, skipDuplicates: true });
+        if (stockOpnameItems.length > 0) await tx.stockOpnameItem.createMany({ data: stockOpnameItems, skipDuplicates: true });
+
+        const expenses = formatBackupDates(backupData.expenses);
+        const discountRules = formatBackupDates(backupData.discountRules);
+        const capitals = formatBackupDates(backupData.capitals);
+
+        if (expenses.length > 0) await tx.expense.createMany({ data: expenses, skipDuplicates: true });
+        if (discountRules.length > 0) await tx.discountRule.createMany({ data: discountRules, skipDuplicates: true });
+        if (capitals.length > 0) await tx.capital.createMany({ data: capitals, skipDuplicates: true });
       }
     }, {
-      maxWait: 10000,
-      timeout: 30000
+      maxWait: 15000,
+      timeout: 60000
     });
 
     return Response.json({ success: true, message: "Database toko berhasil dipulihkan dari file backup." });

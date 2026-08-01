@@ -1,16 +1,20 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
     const session = await getSession();
-    if (session?.role !== 'ADMIN' && session?.role !== 'WAREHOUSE') {
+    if (session?.role !== 'ADMIN' && session?.role !== 'WAREHOUSE' && session?.role !== 'SUPER_ADMIN') {
       return Response.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
+    let whereClause: any = {};
+    if (session?.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session?.storeId;
+    }
+
     const orders = await prisma.order.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
         supplier: true,

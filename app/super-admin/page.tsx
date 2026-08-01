@@ -5,8 +5,9 @@ import Swal from 'sweetalert2';
 
 export default function SuperAdminPage() {
   const [stores, setStores] = useState([]);
+  const [globalStats, setGlobalStats] = useState<any>(null);
   const [allowPublic, setAllowPublic] = useState(false);
-  
+
   // State for creating new store
   const [showModal, setShowModal] = useState(false);
   const [storeName, setStoreName] = useState('');
@@ -34,6 +35,15 @@ export default function SuperAdminPage() {
   const [deleteError, setDeleteError] = useState('');
   const [deleteSuccess, setDeleteSuccess] = useState('');
 
+  // State for changing store password
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedStoreForPassword, setSelectedStoreForPassword] = useState<any>(null);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState('');
+  const [newPasswordForStore, setNewPasswordForStore] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
   useEffect(() => {
     fetchStores();
     fetchSettings();
@@ -44,6 +54,7 @@ export default function SuperAdminPage() {
     if (res.ok) {
       const data = await res.json();
       setStores(data.stores || []);
+      setGlobalStats(data.globalStats || null);
     }
   };
 
@@ -125,23 +136,34 @@ export default function SuperAdminPage() {
     setClearError('');
     setClearLoading(true);
 
-    const res = await fetch(`/api/stores/${storeToClear.id}/clear`, {
-      method: 'DELETE'
+    Swal.fire({
+      title: `Mengosongkan Toko ${storeToClear?.name}...`,
+      text: 'Harap tunggu, sedang menghapus seluruh data operasional toko.',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
     });
 
-    const data = await res.json();
-    setClearLoading(false);
+    try {
+      const res = await fetch(`/api/stores/${storeToClear.id}/clear`, {
+        method: 'DELETE'
+      });
 
-    if (res.ok && data.success) {
-      setClearSuccess(data.message);
-      
-      setTimeout(() => {
+      const data = await res.json();
+      setClearLoading(false);
+
+      if (res.ok && data.success) {
         setShowClearModal(false);
         setStoreToClear(null);
-        setClearSuccess('');
-      }, 3000);
-    } else {
-      setClearError(data.message || 'Gagal mengosongkan data');
+        setClearConfirmationText('');
+        fetchStores(); // Refresh dashboard table & global stats
+        Swal.fire('Berhasil!', data.message || 'Data toko berhasil dikosongkan.', 'success');
+      } else {
+        setClearError(data.message || 'Gagal mengosongkan data');
+        Swal.fire('Gagal', data.message || 'Gagal mengosongkan data toko.', 'error');
+      }
+    } catch (err) {
+      setClearLoading(false);
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat mengosongkan data toko.', 'error');
     }
   };
 
@@ -180,6 +202,58 @@ export default function SuperAdminPage() {
       }, 2000);
     } else {
       setDeleteError(data.message || 'Gagal menghapus toko');
+    }
+  };
+
+  const handleOpenPasswordModal = (store: any) => {
+    setSelectedStoreForPassword(store);
+    const defaultUser = store.users?.find((u: any) => u.role === 'ADMIN')?.id || store.users?.[0]?.id || '';
+    setSelectedUserForPassword(defaultUser);
+    setNewPasswordForStore('');
+    setPasswordError('');
+    setPasswordSuccess('');
+    setShowPasswordModal(true);
+  };
+
+  const handleChangeStorePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForPassword) {
+      setPasswordError("Pilih akun user terlebih dahulu");
+      return;
+    }
+    if (!newPasswordForStore || newPasswordForStore.length < 4) {
+      setPasswordError("Password minimal 4 karakter");
+      return;
+    }
+
+    setPasswordError('');
+    setPasswordSuccess('');
+    setPasswordLoading(true);
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedUserForPassword, password: newPasswordForStore })
+      });
+
+      const data = await res.json();
+      setPasswordLoading(false);
+
+      if (res.ok && data.success) {
+        setPasswordSuccess(`Password akun toko berhasil diperbarui!`);
+        setNewPasswordForStore('');
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setSelectedStoreForPassword(null);
+          setPasswordSuccess('');
+        }, 2000);
+      } else {
+        setPasswordError(data.message || 'Gagal mengubah password');
+      }
+    } catch (err) {
+      setPasswordLoading(false);
+      setPasswordError('Terjadi kesalahan jaringan/sistem.');
     }
   };
 
@@ -370,7 +444,10 @@ export default function SuperAdminPage() {
 
         const result = await res.json();
         if (result.success) {
-          Swal.fire('Berhasil!', `Data toko ${storeToRestore.name} (${storeToRestore.code}) berhasil dipulihkan.`, 'success');
+          fetchStores(); // Refresh dashboard table & global stats immediately
+          Swal.fire('Berhasil!', `Data toko ${storeToRestore.name} (${storeToRestore.code}) berhasil dipulihkan.`, 'success').then(() => {
+            fetchStores();
+          });
         } else {
           Swal.fire('Gagal', result.message || 'Gagal memulihkan database toko.', 'error');
         }
@@ -379,6 +456,41 @@ export default function SuperAdminPage() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleResetAllStores = async () => {
+    const confirm = await Swal.fire({
+      title: '⚠️ KOSONGKAN SEMUA DATA TOKO?',
+      text: 'Anda akan menghapus seluruh data operasional (Barang, Transaksi, Laporan, Keuangan, Kasir/Gudang) di SEMUA TOKO. Informasi Toko dan Akun Manager setiap toko AKAN TETAP DIPERTAHANKAN. Lanjutkan?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Ya, Kosongkan Semua Data!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    Swal.fire({
+      title: 'Mengosongkan Seluruh Data Toko...',
+      text: 'Harap tunggu, sedang menghapus seluruh data operasional toko...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    try {
+      const res = await fetch('/api/reset', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        fetchStores();
+        Swal.fire('Berhasil!', data.message || 'Seluruh data operasional toko berhasil dikosongkan. Informasi toko & akun manager dipertahankan.', 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal mengosongkan data toko.', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat mengosongkan data.', 'error');
+    }
   };
 
   return (
@@ -391,171 +503,183 @@ export default function SuperAdminPage() {
         style={{ display: 'none' }} 
       />
 
-      <div style={{ marginBottom: "2rem" }}>
+      <div style={{ marginBottom: "1.5rem" }}>
         <h1 className="gradient-text" style={{ fontSize: "2rem" }}>Dashboard Super Admin</h1>
-        <p style={{ color: "var(--text-muted)" }}>Kelola sistem Multi-Toko dan Pengaturan Global</p>
+        <p style={{ color: "var(--text-muted)" }}>Kelola sistem Multi-Toko, Performa Keuangan Global, dan Pengaturan Sistem</p>
       </div>
 
-      <div className="grid-2">
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h2 className="card-title" style={{ marginBottom: 0 }}>Daftar Toko Terdaftar</h2>
-            <button className="btn btn-success" onClick={() => setShowModal(true)}>
-              + Tambah Toko
-            </button>
+      {/* RINGKASAN GLOBAL SEMUA TOKO */}
+      {globalStats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>🛒 Total Transaksi</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 'bold', marginTop: '0.25rem' }}>{globalStats.transactionCount} Transaksi</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Dari seluruh toko</div>
           </div>
-          
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Kode</th>
-                  <th>Nama Toko</th>
-                  <th style={{ textAlign: 'center' }}>User</th>
-                  <th style={{ textAlign: 'center' }}>Barang</th>
-                  <th style={{ textAlign: 'center' }}>Transaksi</th>
-                  <th>Status</th>
-                  <th>Tanggal Dibuat</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stores.map((store: any) => (
-                  <tr key={store.id}>
-                    <td><strong>{store.code}</strong></td>
-                    <td>{store.name}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ 
-                        padding: '2px 8px', 
-                        borderRadius: '12px', 
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        backgroundColor: '#eff6ff',
-                        color: '#1d4ed8'
-                      }}>
-                        {store._count?.users ?? 0}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ 
-                        padding: '2px 8px', 
-                        borderRadius: '12px', 
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        backgroundColor: '#fef3c7',
-                        color: '#d97706'
-                      }}>
-                        {store._count?.products ?? 0}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ 
-                        padding: '2px 8px', 
-                        borderRadius: '12px', 
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        backgroundColor: '#dcfce7',
-                        color: '#15803d'
-                      }}>
-                        {store._count?.transactions ?? 0}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ 
-                        padding: '4px 8px', 
-                        borderRadius: '4px', 
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold',
-                        backgroundColor: store.isActive ? '#dcfce7' : '#fee2e2',
-                        color: store.isActive ? '#166534' : '#991b1b'
-                      }}>
-                        {store.isActive ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                    </td>
-                    <td>{new Date(store.createdAt).toLocaleDateString()}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        <button 
-                          onClick={() => handleBackupStore(store)}
-                          title="Unduh Backup Toko Ini"
-                          style={{
-                            background: '#0284c7',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          💾 Backup
-                        </button>
-                        <button 
-                          onClick={() => handleTriggerRestoreStore(store)}
-                          title="Restore Backup ke Toko Ini"
-                          style={{
-                            background: '#8b5cf6',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          ⬆️ Restore
-                        </button>
-                        <button 
-                          onClick={() => handleOpenClearModal(store)}
-                          title="Kosongkan Data Toko"
-                          style={{
-                            background: '#f59e0b',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          Kosongkan
-                        </button>
-                        <button 
-                          onClick={() => handleOpenDeleteModal(store)}
-                          title="Hapus Toko Permanen"
-                          style={{
-                            background: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          🗑️ Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {stores.length === 0 && (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)" }}>
-                      Belum ada toko yang terdaftar.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #059669, #047857)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>💰 Total Omzet</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginTop: '0.25rem' }}>Rp {globalStats.totalRevenue.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Pendapatan Kotor</div>
+          </div>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>📈 Keuntungan (Laba Kotor)</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginTop: '0.25rem' }}>Rp {globalStats.grossProfit.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Omzet - Harga Modal (HPP)</div>
+          </div>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #d97706, #b45309)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>💸 Biaya Operasional</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginTop: '0.25rem' }}>Rp {globalStats.totalExpense.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Pengeluaran Operasional</div>
+          </div>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>💵 Laba Bersih</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginTop: '0.25rem' }}>Rp {globalStats.netProfit.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Keuntungan - Biaya</div>
+          </div>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>🔴 Total Hutang</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginTop: '0.25rem' }}>Rp {globalStats.totalDebt.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Hutang ke Supplier</div>
+          </div>
+          <div className="card" style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', opacity: 0.9 }}>🔵 Total Piutang</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', marginTop: '0.25rem' }}>Rp {globalStats.totalReceivable.toLocaleString('id-ID')}</div>
+            <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Piutang Pelanggan</div>
           </div>
         </div>
+      )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* DAFTAR TOKO TERDAFTAR */}
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <h2 className="card-title" style={{ marginBottom: 0 }}>Daftar Toko Terdaftar</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>Rincian performa operasional & keuangan masing-masing toko</p>
+          </div>
+          <button className="btn btn-success" onClick={() => setShowModal(true)}>
+            + Tambah Toko
+          </button>
+        </div>
+        
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Kode</th>
+                <th>Nama Toko</th>
+                <th style={{ textAlign: 'center' }}>User</th>
+                <th style={{ textAlign: 'center' }}>Barang</th>
+                <th style={{ textAlign: 'center' }}>Transaksi</th>
+                <th>Omzet</th>
+                <th>Keuntungan</th>
+                <th>Biaya Operasional</th>
+                <th>Laba Bersih</th>
+                <th>Total Hutang</th>
+                <th>Total Piutang</th>
+                <th>Status</th>
+                <th>Tanggal Dibuat</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stores.map((store: any) => (
+                <tr key={store.id}>
+                  <td><strong>{store.code}</strong></td>
+                  <td style={{ fontWeight: 600 }}>{store.name}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                      {store._count?.users ?? 0}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#fef3c7', color: '#d97706' }}>
+                      {store._count?.products ?? 0}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#dcfce7', color: '#15803d' }}>
+                      {store.stats?.transactionCount ?? store._count?.transactions ?? 0}
+                    </span>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#0369a1' }}>
+                    Rp {(store.stats?.totalRevenue || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#6d28d9' }}>
+                    Rp {(store.stats?.grossProfit || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#b45309' }}>
+                    Rp {(store.stats?.totalExpense || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontWeight: 'bold', color: (store.stats?.netProfit || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                    Rp {(store.stats?.netProfit || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#b91c1c' }}>
+                    Rp {(store.stats?.totalDebt || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#1d4ed8' }}>
+                    Rp {(store.stats?.totalReceivable || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td>
+                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: store.isActive ? '#dcfce7' : '#fee2e2', color: store.isActive ? '#166534' : '#991b1b' }}>
+                      {store.isActive ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(store.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <button 
+                        onClick={() => handleOpenPasswordModal(store)}
+                        title="Ubah Password Akun Toko Ini"
+                        style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                      >
+                        🔑 Password
+                      </button>
+                      <button 
+                        onClick={() => handleBackupStore(store)}
+                        title="Unduh Backup Toko Ini"
+                        style={{ background: '#0284c7', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                      >
+                        💾 Backup
+                      </button>
+                      <button 
+                        onClick={() => handleTriggerRestoreStore(store)}
+                        title="Restore Backup ke Toko Ini"
+                        style={{ background: '#8b5cf6', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                      >
+                        ⬆️ Restore
+                      </button>
+                      <button 
+                        onClick={() => handleOpenClearModal(store)}
+                        title="Kosongkan Data Toko"
+                        style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                      >
+                        Kosongkan
+                      </button>
+                      <button 
+                        onClick={() => handleOpenDeleteModal(store)}
+                        title="Hapus Toko Permanen"
+                        style={{ background: '#ef4444', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
+                      >
+                        🗑️ Hapus
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {stores.length === 0 && (
+                <tr>
+                  <td colSpan={14} style={{ textAlign: "center", color: "var(--text-muted)" }}>
+                    Belum ada toko yang terdaftar.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* PENGATURAN SISTEM & BACKUP GLOBAL */}
+      <div className="grid-2">
           <div className="card">
             <h2 className="card-title">Pengaturan Sistem</h2>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -605,7 +729,23 @@ export default function SuperAdminPage() {
               </button>
             </div>
           </div>
-        </div>
+      </div>
+
+      {/* DANGER ZONE GLOBAL: KOSONGKAN SEMUA DATA TOKO */}
+      <div className="card" style={{ marginTop: '1.5rem', border: '2px solid #ef4444' }}>
+        <h2 className="card-title" style={{ color: '#ef4444' }}>⚠️ Kosongkan Semua Data Toko (Global Reset)</h2>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.25rem" }}>
+          Tindakan ini akan menghapus seluruh data operasional (Barang, Kategori, Transaksi, Laporan Keuangan, Kasir & Gudang) di <strong>SEMUA TOKO</strong>. 
+          <br/>
+          <strong style={{ color: '#166534' }}>✅ Informasi Toko & Akun Manager (ADMIN) setiap toko AKAN TETAP DIPERTAHANKAN.</strong>
+        </p>
+        <button 
+          onClick={handleResetAllStores}
+          className="btn"
+          style={{ backgroundColor: '#ef4444', width: '100%', padding: '0.85rem', fontWeight: 'bold', fontSize: '0.95rem' }}
+        >
+          🗑️ Kosongkan Semua Data Toko (Pertahankan Informasi Toko & Manager)
+        </button>
       </div>
 
       {/* Modal Tambah Toko */}
@@ -804,6 +944,79 @@ export default function SuperAdminPage() {
                 disabled={deleteLoading || deleteConfirmationText !== storeToDelete.code}
               >
                 {deleteLoading ? 'Menghapus...' : 'Ya, Hapus Toko Permanen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ubah Password Toko */}
+      {showPasswordModal && selectedStoreForPassword && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">🔑 Ubah Password Akun Toko</h3>
+              <button 
+                onClick={() => setShowPasswordModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              {passwordError && <div style={{ color: '#ef4444', backgroundColor: '#fef2f2', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500' }}>{passwordError}</div>}
+              {passwordSuccess && <div style={{ color: '#166534', backgroundColor: '#dcfce7', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500' }}>{passwordSuccess}</div>}
+
+              <p style={{ marginBottom: '1rem' }}>
+                Ganti password akun user untuk toko <strong>{selectedStoreForPassword.name} ({selectedStoreForPassword.code})</strong>.
+              </p>
+
+              <form id="changePasswordForm" onSubmit={handleChangeStorePassword}>
+                <div className="form-group">
+                  <label>Pilih Akun User Toko:</label>
+                  <select 
+                    value={selectedUserForPassword} 
+                    onChange={e => setSelectedUserForPassword(e.target.value)} 
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg)' }}
+                    required
+                  >
+                    {selectedStoreForPassword.users?.map((u: any) => (
+                      <option key={u.id} value={u.id}>
+                        {u.role === 'ADMIN' ? '👑 [MANAGER] ' : `👤 [${u.role}] `}{u.name} ({u.username})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Password Baru:</label>
+                  <input 
+                    type="password" 
+                    placeholder="Masukkan password baru (min. 4 karakter)..." 
+                    value={newPasswordForStore} 
+                    onChange={e => setNewPasswordForStore(e.target.value)} 
+                    required 
+                    minLength={4}
+                  />
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                onClick={() => setShowPasswordModal(false)}
+                disabled={passwordLoading}
+              >
+                Batal
+              </button>
+              <button 
+                type="submit" 
+                form="changePasswordForm"
+                className="btn btn-success" 
+                disabled={passwordLoading || !newPasswordForStore}
+              >
+                {passwordLoading ? 'Memproses...' : 'Simpan Password Baru'}
               </button>
             </div>
           </div>

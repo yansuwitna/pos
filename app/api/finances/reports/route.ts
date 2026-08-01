@@ -1,14 +1,23 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
 
 export async function GET(req: Request) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return Response.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    let storeFilter: any = {};
+    if (session.role !== 'SUPER_ADMIN' && session.storeId) {
+      storeFilter = { storeId: session.storeId };
+    }
+
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let whereClause: any = {};
+    let whereClause: any = { ...storeFilter };
     if (startDate && endDate) {
       whereClause.createdAt = {
         gte: new Date(startDate),
@@ -28,7 +37,6 @@ export async function GET(req: Request) {
     transactions.forEach(t => {
       totalPendapatan += t.grandTotal;
       t.items.forEach(item => {
-        // HPP dihitung dari (harga modal x qty terjual)
         totalHPP += (item.product?.cost || 0) * item.quantity;
       });
     });
@@ -36,7 +44,7 @@ export async function GET(req: Request) {
     let labaKotor = totalPendapatan - totalHPP;
 
     // 2. BEBAN (Pengeluaran Operasional)
-    let expenseWhereClause: any = {};
+    let expenseWhereClause: any = { ...storeFilter };
     if (startDate && endDate) {
       expenseWhereClause.date = {
         gte: new Date(startDate),
@@ -49,32 +57,28 @@ export async function GET(req: Request) {
 
     let labaBersih = labaKotor - totalBeban;
 
-    // --- NERACA (Semua waktu, tidak peduli startDate/endDate) ---
+    // --- NERACA (Semua waktu, milik toko ini) ---
     
     // A. Kas di Tangan
-    // Kas Masuk = Modal Awal + Pembayaran Tunai Transaksi + Pembayaran Cicilan Piutang
-    const allCapitals = await prisma.capital.findMany();
-    const allTransactions = await prisma.transaction.findMany();
-    const allReceivablePayments = await prisma.receivablePayment.findMany();
+    const allCapitals = await prisma.capital.findMany({ where: storeFilter });
+    const allTransactions = await prisma.transaction.findMany({ where: storeFilter });
+    const allReceivablePayments = await prisma.receivablePayment.findMany({ where: storeFilter });
     let totalKasMasuk = 0;
     
-    // Tambahkan semua Suntikan Modal
     allCapitals.forEach(c => totalKasMasuk += c.amount);
 
     allTransactions.forEach(t => {
-      // Kas nyata yang masuk adalah jumlah uang yang dibayar dikurangi kembalian
       totalKasMasuk += (t.payment - t.change);
     });
     allReceivablePayments.forEach(p => totalKasMasuk += p.amount);
 
-    // Kas Keluar = Pembayaran Tunai Pembelian + Pembayaran Cicilan Hutang + Semua Pengeluaran
-    const allPurchases = await prisma.purchase.findMany();
-    const allDebtPayments = await prisma.debtPayment.findMany();
-    const allExpenses = await prisma.expense.findMany();
+    // Kas Keluar
+    const allPurchases = await prisma.purchase.findMany({ where: storeFilter });
+    const allDebtPayments = await prisma.debtPayment.findMany({ where: storeFilter });
+    const allExpenses = await prisma.expense.findMany({ where: storeFilter });
     
     let totalKasKeluar = 0;
     allPurchases.forEach(p => {
-      // Fallback ke totalCost jika amountPaid 0 tapi statusnya PAID (untuk data lama)
       if (p.amountPaid > 0) {
         totalKasKeluar += p.amountPaid;
       } else if (p.paymentStatus === 'PAID') {
@@ -89,13 +93,12 @@ export async function GET(req: Request) {
     // B. Piutang Usaha
     let totalPiutang = 0;
     allTransactions.forEach(t => {
-      // Pastikan amountPaid tidak melebihi grandTotal (untuk menghindari piutang negatif pada data lama)
       const validAmountPaid = Math.min(t.grandTotal, t.amountPaid);
       totalPiutang += (t.grandTotal - validAmountPaid);
     });
 
     // C. Persediaan Barang (Inventory Value)
-    const allProducts = await prisma.product.findMany();
+    const allProducts = await prisma.product.findMany({ where: storeFilter });
     let nilaiPersediaan = 0;
     allProducts.forEach(p => {
       nilaiPersediaan += (p.stock * p.cost);
@@ -109,7 +112,7 @@ export async function GET(req: Request) {
       totalHutang += (p.totalCost - p.amountPaid);
     });
 
-    // E. Ekuitas (Modal Sendiri = Aktiva - Kewajiban)
+    // E. Ekuitas
     const ekuitas = totalAktiva - totalHutang;
 
     return Response.json({

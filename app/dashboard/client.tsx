@@ -13,10 +13,15 @@ export default function DashboardClient({ role, name }: Props) {
   const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
-    const savedStore = localStorage.getItem('pos_store_info');
-    if (savedStore) {
-      try { setStoreInfo(JSON.parse(savedStore)); } catch(e){}
-    }
+    fetch('/api/settings/store')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.storeInfo) {
+          setStoreInfo(data.storeInfo);
+          localStorage.setItem('pos_store_info', JSON.stringify(data.storeInfo));
+        }
+      })
+      .catch(() => {});
     
     if (role === 'CASHIER') {
       fetch('/api/transactions')
@@ -83,9 +88,36 @@ export default function DashboardClient({ role, name }: Props) {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)' }}>Selamat Datang, {name}!</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Anda masuk sebagai {role}</p>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>Anda masuk sebagai {role}</p>
+
+        {/* INFORMASI TOKO */}
+        {storeInfo && (
+          <div className="card" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginTop: '0.75rem' }}>
+            {storeInfo.logo ? (
+              <img src={storeInfo.logo} alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '8px', border: '1px solid var(--border)', padding: '3px', background: '#fff' }} />
+            ) : (
+              <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'linear-gradient(135deg, #ef4444, #b91c1c)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                {storeInfo.name?.[0]?.toUpperCase() || '🏪'}
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏪 Informasi Toko</div>
+              <h2 style={{ margin: '2px 0 0 0', fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-main)' }}>{storeInfo.name}</h2>
+              {storeInfo.address && (
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📍 {storeInfo.address}
+                </p>
+              )}
+              {storeInfo.phone && (
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  📞 WA / Telp: {storeInfo.phone}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {role === 'CASHIER' && (
@@ -125,7 +157,7 @@ export default function DashboardClient({ role, name }: Props) {
       )}
 
       {role === 'ADMIN' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Section: Ringkasan Statistik */}
           <div>
@@ -204,6 +236,11 @@ export default function DashboardClient({ role, name }: Props) {
             <h2 style={{ fontSize: '1.25rem' }}>Manajemen User</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tambah atau kelola akun karyawan.</p>
           </a>
+              <a href="/settings" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💾</div>
+                <h2 style={{ fontSize: '1.25rem' }}>Backup & Restore</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Unduh atau pulihkan database toko.</p>
+              </a>
               <a href="/settings" className="card" style={{ textDecoration: 'none', color: 'inherit', textAlign: 'center', transition: 'all 0.2s' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚙️</div>
                 <h2 style={{ fontSize: '1.25rem' }}>Pengaturan</h2>

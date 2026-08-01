@@ -42,10 +42,15 @@ export default function CustomersPage() {
       if (!editCustomer.name) return Swal.fire('Peringatan', "Nama Pelanggan wajib diisi", 'warning');
       setLoading(true);
       try {
-        const res = await fetch(`/api/customers/${editCustomer.id}`, {
+        const res = await fetch('/api/customers', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editCustomer)
+          body: JSON.stringify({
+            id: editCustomer.id,
+            name: editCustomer.name,
+            phone: editCustomer.phone,
+            address: editCustomer.address
+          })
         });
         const data = await res.json();
         if (data.success) {

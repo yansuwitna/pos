@@ -333,7 +333,26 @@ export default function OpnamePage() {
 
               <div className="form-group" style={{ marginTop: '1.5rem' }}>
                 <label>Keterangan Opname</label>
-                <textarea placeholder="Contoh: Opname rutin akhir bulan juli..." value={notes} onChange={e => setNotes(e.target.value)} rows={4}></textarea>
+                <textarea 
+                  placeholder="Contoh: Opname rutin akhir bulan juli..." 
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  rows={4}
+                  style={{ 
+                    width: '100%', 
+                    padding: '0.75rem 1rem', 
+                    borderRadius: '10px', 
+                    border: '1px solid var(--border)', 
+                    fontFamily: 'inherit', 
+                    fontSize: '0.95rem',
+                    resize: 'vertical',
+                    minHeight: '90px',
+                    outline: 'none',
+                    backgroundColor: 'var(--bg-card, #ffffff)',
+                    color: 'var(--text-main, #1e293b)',
+                    transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+                  }}
+                />
               </div>
             </div>
 

@@ -5,6 +5,7 @@ type Product = {
   id: string;
   sku: string | null;
   name: string;
+  type?: 'GOODS' | 'SERVICE';
   price: number;
   cost: number;
   stock: number;
@@ -15,9 +16,10 @@ type Props = {
   onSelect: (product: Product) => void;
   placeholder?: string;
   width?: string;
+  hideOutOfStock?: boolean;
 };
 
-export default function ProductSearch({ products, onSelect, placeholder = "Ketik Nama Barang / SKU...", width = '100%' }: Props) {
+export default function ProductSearch({ products, onSelect, placeholder = "Ketik Nama Barang / SKU...", width = '100%', hideOutOfStock = false }: Props) {
   const [search, setSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -35,6 +37,7 @@ export default function ProductSearch({ products, onSelect, placeholder = "Ketik
 
   const filtered = products.filter(p => {
     if (!search) return false;
+    if (hideOutOfStock && p.type === 'GOODS' && p.stock <= 0) return false;
     const q = search.toLowerCase();
     return (p.sku && p.sku.toLowerCase().includes(q)) || p.name.toLowerCase().includes(q);
   });

@@ -42,10 +42,15 @@ export default function SuppliersPage() {
       if (!editSupplier.name) return Swal.fire('Peringatan', "Nama Penyedia Barang wajib diisi", 'warning');
       setLoading(true);
       try {
-        const res = await fetch(`/api/suppliers/${editSupplier.id}`, {
+        const res = await fetch('/api/suppliers', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editSupplier)
+          body: JSON.stringify({
+            id: editSupplier.id,
+            name: editSupplier.name,
+            contact: editSupplier.contact,
+            address: editSupplier.address
+          })
         });
         const data = await res.json();
         if (data.success) {

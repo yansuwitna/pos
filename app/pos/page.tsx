@@ -86,8 +86,17 @@ export default function POSPage() {
     fetch('/api/discount-rules').then(res => res.json()).then(data => { if (data.success) setDiscountRules(data.rules.filter((r: DiscountRule) => r.isActive)); });
     fetch('/api/auth/me').then(res => res.json()).then(data => { if (data.success && data.user) setKasirName(data.user.name); });
     
+    fetch('/api/settings/store')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.storeInfo) {
+          setStoreInfo(data.storeInfo);
+          localStorage.setItem('pos_store_info', JSON.stringify(data.storeInfo));
+        }
+      })
+      .catch(() => {});
+    
     if (localStorage.getItem('pos_camera_id')) setSelectedCamera(localStorage.getItem('pos_camera_id')!);
-    if (localStorage.getItem('pos_store_info')) try { setStoreInfo(JSON.parse(localStorage.getItem('pos_store_info')!)); } catch(e){}
     const mode = localStorage.getItem('pos_scanner_mode') || 'camera';
     setScannerMode(mode);
     if (localStorage.getItem('pos_printer_type')) setPrinterType(localStorage.getItem('pos_printer_type')!);
@@ -186,21 +195,66 @@ export default function POSPage() {
   };
 
   const addToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        const newQty = existing.quantity + 1;
-        return prev.map(item => item.id === product.id ? { ...item, quantity: newQty, subtotal: calcSubtotal(item.price, newQty, item.discountPercent) } : item);
+    if (product.type === 'GOODS' && product.stock <= 0) {
+      Swal.fire('Stok Habis!', `Stok barang "${product.name}" telah habis (Stok: 0).`, 'warning');
+      return;
+    }
+
+    const existing = cart.find(item => item.id === product.id);
+    if (existing) {
+      const currentQty = Number(existing.quantity) || 0;
+      const newQty = currentQty + 1;
+      if (product.type === 'GOODS' && newQty > product.stock) {
+        Swal.fire('Stok Tidak Cukup!', `Stok barang "${product.name}" hanya tersisa ${product.stock}.`, 'warning');
+        return;
       }
-      return [...prev, { ...product, quantity: 1, subtotal: calcSubtotal(product.price, 1, product.discountPercent) }];
-    });
+      setCart(prev => prev.map(item => item.id === product.id ? { 
+        ...item, 
+        quantity: newQty, 
+        subtotal: calcSubtotal(item.price, newQty, item.discountPercent) 
+      } : item));
+    } else {
+      setCart(prev => [...prev, { 
+        ...product, 
+        quantity: 1, 
+        subtotal: calcSubtotal(product.price, 1, product.discountPercent) 
+      }]);
+    }
   };
 
   const updateQuantity = (productId: string, quantity: number | string) => {
+    if (quantity === '') {
+      setCart(prev => prev.map(item => item.id === productId ? { 
+        ...item, 
+        quantity: '' as any, 
+        subtotal: 0 
+      } : item));
+      return;
+    }
+
+    const numQty = Number(quantity);
+    const targetItem = cart.find(item => item.id === productId);
+
+    if (targetItem && targetItem.type === 'GOODS' && numQty > targetItem.stock) {
+      Swal.fire(
+        'Stok Melebihi Batas!', 
+        `Jumlah barang "${targetItem.name}" yang dimasukkan (${numQty}) melebihi sisa stok (${targetItem.stock}).`, 
+        'warning'
+      );
+      const cappedQty = Math.max(1, targetItem.stock);
+      setCart(prev => prev.map(item => item.id === productId ? { 
+        ...item, 
+        quantity: cappedQty, 
+        subtotal: calcSubtotal(item.price, cappedQty, item.discountPercent) 
+      } : item));
+      return;
+    }
+
+    const safeQty = Math.max(1, numQty || 1);
     setCart(prev => prev.map(item => item.id === productId ? { 
       ...item, 
       quantity: quantity as any, 
-      subtotal: calcSubtotal(item.price, Math.max(1, Number(quantity) || 1), item.discountPercent) 
+      subtotal: calcSubtotal(item.price, safeQty, item.discountPercent) 
     } : item));
   };
 
@@ -284,16 +338,21 @@ export default function POSPage() {
             <a href="/dashboard" style={{ textDecoration: 'none', color: '#fff', fontSize: '20px', padding: '0 5px' }}>
               ⬅️
             </a>
-            <h1 style={{ color: '#ef4444', margin: 0, fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', textTransform: 'uppercase' }}>
+            <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
               {storeInfo?.logo ? (
                 <img src={storeInfo.logo} alt="Logo" style={{ maxHeight: '24px', objectFit: 'contain', borderRadius: '4px' }} />
               ) : (
-                <span style={{background: '#ef4444', color: '#fff', padding: '2px 6px', borderRadius: '4px'}}>
+                <span style={{background: '#ef4444', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold'}}>
                   {storeInfo?.name?.[0]?.toUpperCase() || 'P'}
                 </span>
               )}
-              {storeInfo?.name || 'POS'}
-            </h1>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', lineHeight: 1.2 }}>{storeInfo?.name || 'POS'}</div>
+                {storeInfo?.address && (
+                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 'normal', textTransform: 'none', lineHeight: 1 }}>📍 {storeInfo.address}</div>
+                )}
+              </div>
+            </div>
           </div>
           <div style={{ fontSize: '12px', display: 'flex', gap: '5px', alignItems: 'center' }}>
             👤 {kasirName || 'Kasir'}
@@ -303,7 +362,7 @@ export default function POSPage() {
         {/* TOP BAR MOBILE (Search & Camera) */}
         <div style={{ background: '#fff', borderBottom: '2px solid #ef4444', padding: '10px 15px', display: 'flex', gap: '10px', alignItems: 'center' }}>
           <div style={{ flex: 1 }} id="product-search-container">
-             <ProductSearch products={products} onSelect={addToCart} />
+             <ProductSearch products={products} onSelect={addToCart} hideOutOfStock={true} />
           </div>
           {scannerMode === 'camera' && (
             <div onClick={() => {
@@ -472,16 +531,21 @@ export default function POSPage() {
       {/* HEADER */}
       <div style={{ background: '#000', color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <h1 style={{ color: '#ef4444', margin: 0, fontSize: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', textTransform: 'uppercase' }}>
+          <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '10px' }}>
             {storeInfo?.logo ? (
               <img src={storeInfo.logo} alt="Logo" style={{ maxHeight: '32px', objectFit: 'contain', borderRadius: '4px' }} />
             ) : (
-              <span style={{background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '4px'}}>
+              <span style={{background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '20px'}}>
                 {storeInfo?.name?.[0]?.toUpperCase() || 'P'}
               </span>
             )}
-            {storeInfo?.name || 'POS'}
-          </h1>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', lineHeight: 1.2 }}>{storeInfo?.name || 'POS'}</div>
+              {storeInfo?.address && (
+                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'normal', textTransform: 'none', lineHeight: 1.2 }}>📍 {storeInfo.address}</div>
+              )}
+            </div>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '40px', fontSize: '14px' }}>
           <div>
@@ -516,7 +580,7 @@ export default function POSPage() {
             </div>
           )}
           <div style={{ width: '400px' }} id="product-search-container">
-             <ProductSearch products={products} onSelect={addToCart} />
+             <ProductSearch products={products} onSelect={addToCart} hideOutOfStock={true} />
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>

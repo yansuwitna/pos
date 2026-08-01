@@ -1,11 +1,16 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function GET(req: Request) {
   try {
+    const session = await getSession();
+    let whereClause: any = {};
+    if (session?.storeId && session.role !== 'SUPER_ADMIN') {
+      whereClause.storeId = session.storeId;
+    }
+
     const rules = await prisma.discountRule.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
     return Response.json({ success: true, rules });
@@ -17,7 +22,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
-    if (!session || session.role !== 'ADMIN') {
+    if (!session || (session.role !== 'ADMIN' && session.role !== 'SUPER_ADMIN')) {
       return Response.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
@@ -26,7 +31,7 @@ export async function POST(req: Request) {
       return Response.json({ success: false, message: "Nama dan persen diskon harus diisi" }, { status: 400 });
     }
 
-    let storeId = data.storeId || session?.storeId;
+    let storeId = session?.storeId || data.storeId;
     if (!storeId) {
       const fallbackStore = await prisma.store.findFirst();
       if (!fallbackStore) {

@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/auth';
 import { cookies } from 'next/headers';
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
@@ -40,7 +38,7 @@ export async function POST(req: Request) {
       return Response.json({ success: true, user: sessionData });
     }
 
-    return Response.json({ success: false, message: "Kredensial tidak valid" }, { status: 401 });
+    return Response.json({ success: false, message: "Username dan Password salah" }, { status: 401 });
   } catch (error) {
     return Response.json({ success: false, message: "Terjadi kesalahan server" }, { status: 500 });
   }

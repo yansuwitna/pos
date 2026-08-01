@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function GET() {
   try {
@@ -61,6 +59,39 @@ export async function POST(req: Request) {
     return Response.json({ success: true, supplier: newSupplier });
   } catch (error: any) {
     return Response.json({ success: false, message: error?.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const session = await getSession();
+    const { id, name, contact, address } = await req.json();
+
+    if (!id) {
+      return Response.json({ success: false, message: "ID supplier tidak ditemukan." }, { status: 400 });
+    }
+    if (!name || !name.trim()) {
+      return Response.json({ success: false, message: "Nama supplier wajib diisi." }, { status: 400 });
+    }
+
+    const where: any = { id };
+    if (session?.role !== 'SUPER_ADMIN' && session?.storeId) {
+      where.storeId = session.storeId;
+    }
+
+    const supplier = await prisma.supplier.update({
+      where,
+      data: {
+        name,
+        contact: contact || null,
+        address: address || null,
+      }
+    });
+
+    return Response.json({ success: true, supplier });
+  } catch (error: any) {
+    console.error("PUT Supplier Error:", error);
+    return Response.json({ success: false, message: error?.message || "Gagal menyimpan perubahan supplier" }, { status: 500 });
   }
 }
 

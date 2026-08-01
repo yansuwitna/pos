@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function GET() {
   try {
@@ -44,6 +42,33 @@ export async function POST(req: Request) {
 
     const customer = await prisma.customer.create({
       data: { name, phone, address, storeId }
+    });
+    return Response.json({ success: true, customer });
+  } catch (error: any) {
+    return Response.json({ success: false, message: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const session = await getSession();
+    const { id, name, phone, address } = await req.json();
+
+    if (!id) {
+      return Response.json({ success: false, message: "ID pelanggan tidak valid" }, { status: 400 });
+    }
+    if (!name || !name.trim()) {
+      return Response.json({ success: false, message: "Nama pelanggan wajib diisi" }, { status: 400 });
+    }
+
+    const where: any = { id };
+    if (session?.role !== 'SUPER_ADMIN' && session?.storeId) {
+      where.storeId = session.storeId;
+    }
+
+    const customer = await prisma.customer.update({
+      where,
+      data: { name, phone: phone || null, address: address || null }
     });
     return Response.json({ success: true, customer });
   } catch (error: any) {

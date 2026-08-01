@@ -19,16 +19,17 @@ export const metadata: Metadata = {
 const roleNavLinks: Record<string, { href: string; label: string }[]> = {
   ADMIN: [
     { href: '/dashboard', label: '🏠 Dashboard' },
-    { href: '/dashboard/products', label: '📦 Stok Barang' },
-    { href: '/manager/expenses', label: '💸 Biaya Operasional' },
-    { href: '/manager/finances', label: '💼 Hutang / Piutang' },
-    { href: '/manager/reports', label: '📈 Laporan Keuangan' },
+    { href: '/users', label: '👥 Manajemen User' },
     { href: '/manager/capital', label: '💰 Modal Usaha' },
     { href: '/manager/discount-rules', label: '🎟️ Aturan Diskon' },
+    { href: '/manager/suppliers', label: '🏢 Supplier' },
+    { href: '/dashboard/products', label: '📦 Stok Barang' },
     { href: '/customers', label: '👥 Daftar Pelanggan' },
-    { href: '/users',     label: '👥 Manajemen User' },
-    { href: '/reports',   label: '📊 Laporan Penjualan' },
-    { href: '/settings',  label: '⚙️ Pengaturan' },
+    { href: '/reports', label: '📊 Laporan Penjualan' },
+    { href: '/manager/finances', label: '💼 Hutang / Piutang' },
+    { href: '/manager/expenses', label: '💸 Biaya Operasional' },
+    { href: '/manager/reports', label: '📈 Laporan Keuangan' },
+    { href: '/settings', label: '⚙️ Pengaturan' },
   ],
   CASHIER: [
     { href: '/dashboard', label: '🏠 Dashboard' },
@@ -40,11 +41,11 @@ const roleNavLinks: Record<string, { href: string; label: string }[]> = {
   WAREHOUSE: [
     { href: '/dashboard', label: '🏠 Dashboard' },
     { href: '/manager', label: '📦 Manajemen Barang' },
-    { href: '/manager/opname', label: '📋 Stok Opname' },
+    { href: '/manager/suppliers', label: '🏢 Supplier' },
     { href: '/manager/orders', label: '📝 Pesanan (PO)' },
     { href: '/manager/purchase', label: '📥 Restock' },
     { href: '/manager/return', label: '📤 Retur' },
-    { href: '/manager/suppliers', label: '🏢 Supplier' },
+    { href: '/manager/opname', label: '📋 Stok Opname' },
     { href: '/manager/finances', label: '💼 Hutang Supplier' },
     { href: '/settings', label: '⚙️ Pengaturan' },
   ],
@@ -59,13 +60,14 @@ export default async function RootLayout({
   const session = await getSession();
   const role = session?.role as string | undefined;
   const name = session?.name as string | undefined;
+  const storeName = session?.storeName as string | undefined;
   const links = role ? (roleNavLinks[role] ?? []) : [];
 
   return (
     <html lang="id" className={poppins.className}>
       <body>
         {session ? (
-          <LayoutWrapper role={role!} name={name!} links={links}>
+          <LayoutWrapper role={role!} name={name!} storeName={storeName} links={links}>
             {children}
           </LayoutWrapper>
         ) : (

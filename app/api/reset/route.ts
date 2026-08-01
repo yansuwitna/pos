@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
@@ -79,12 +77,10 @@ export async function POST(req: Request) {
         await tx.supplier.deleteMany();
         await tx.customer.deleteMany();
         await tx.discountRule.deleteMany();
+        // Super Admin: Hapus seluruh data operasional toko, pertahankan Informasi Toko & Akun Manager (ADMIN)
         await tx.user.deleteMany({
           where: {
-            AND: [
-              { role: { not: 'SUPER_ADMIN' } },
-              { id: { not: session.id } }
-            ]
+            role: { notIn: ['SUPER_ADMIN', 'ADMIN'] }
           }
         });
       } else {
