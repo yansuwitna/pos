@@ -86,6 +86,10 @@ export async function PUT(req: Request) {
 
     const { id, name, role, password, isActive } = await req.json();
 
+    if (!id) {
+      return Response.json({ success: false, message: 'ID User harus disertakan' }, { status: 400 });
+    }
+
     if (id === session.id) {
       if (isActive === false) {
         return Response.json({ success: false, message: 'Anda tidak dapat menonaktifkan akun Anda sendiri' }, { status: 400 });
@@ -95,7 +99,10 @@ export async function PUT(req: Request) {
       }
     }
 
-    const data: any = { name, role, isActive };
+    const data: any = {};
+    if (name !== undefined) data.name = name;
+    if (role !== undefined) data.role = role;
+    if (isActive !== undefined) data.isActive = isActive;
     if (password) data.password = password;
 
     const where: any = { id };
@@ -110,7 +117,8 @@ export async function PUT(req: Request) {
     });
     return Response.json({ success: true, user });
   } catch (error: any) {
-    return Response.json({ success: false, message: error?.message }, { status: 500 });
+    console.error('Error updating user:', error);
+    return Response.json({ success: false, message: error?.message || 'Gagal memperbarui data user' }, { status: 500 });
   }
 }
 

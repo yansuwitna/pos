@@ -31,8 +31,8 @@ Aplikasi ini mendukung multi-tenant (Multi-Toko) dengan 4 hirarki role pengakses
 - **Pembayaran Flexibel**: Mendukung pembayaran Tunai maupun Kredit (Piutang Pelanggan).
 - **Cetak Struk**: Cetak bukti rincian transaksi penjualan.
 
-### 🔑 5. Mandiri Ubah Password (Semua Role)
-- **Seluruh Role User** (Super Admin, Admin/Manager, Gudang, dan Kasir) memiliki akses langsung untuk merubah password akun mereka sendiri secara mandiri melalui menu **⚙️ Pengaturan / 🔑 Ubah Password Saya**.
+### 🏬 6. Login Praktis (Pemilih Nama Toko Dropdown)
+- **Pilihan Nama Toko via Combo Dropdown**: Pengguna tidak perlu mengetikkan kode awal toko secara manual. Cukup pilih **Nama Toko** dari menu combo dropdown (atau `👑 Super Admin`), lalu masukkan username biasa (contoh: `admin` atau `kasir`). Sistem otomatis mengkombinasikan username dengan kode toko.
 
 ---
 

@@ -9,6 +9,44 @@ export default function SuperAdminSettingsPage() {
   const [loadingSettings, setLoadingSettings] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // State Ubah Password Super Admin
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changeOwnPasswordLoading, setChangeOwnPasswordLoading] = useState(false);
+
+  const handleChangeOwnPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return Swal.fire('Perhatian', 'Harap isi semua bidang password', 'warning');
+    }
+    if (newPassword !== confirmPassword) {
+      return Swal.fire('Tidak Cocok', 'Konfirmasi password baru tidak cocok', 'error');
+    }
+
+    setChangeOwnPasswordLoading(true);
+    try {
+      const res = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+      });
+      const data = await res.json();
+      setChangeOwnPasswordLoading(false);
+      if (res.ok && data.success) {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        Swal.fire('Berhasil!', data.message || 'Password Super Admin berhasil diperbarui.', 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal merubah password.', 'error');
+      }
+    } catch (err) {
+      setChangeOwnPasswordLoading(false);
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat merubah password.', 'error');
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -397,6 +435,70 @@ export default function SuperAdminSettingsPage() {
             💡 Backup berkala disarankan sebelum melakukan maintenance besar.
           </div>
         </div>
+      {/* CARD: UBAH PASSWORD AKUN SUPER ADMIN */}
+      <div className="card" style={{ borderRadius: '14px', border: '1px solid #cbd5e1', padding: '1.5rem', marginBottom: '1.5rem', background: '#ffffff' }}>
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          🔑 Ubah Password Akun Super Admin Saya
+        </h2>
+        <p style={{ color: '#64748b', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+          Perbarui kata sandi untuk akun administrator utama sistem.
+        </p>
+
+        <form onSubmit={handleChangeOwnPassword}>
+          <div className="form-group" style={{ marginBottom: '1rem' }}>
+            <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Password Saat Ini</label>
+            <input 
+              type="password" 
+              value={currentPassword} 
+              onChange={e => setCurrentPassword(e.target.value)}
+              placeholder="Masukkan password lama Super Admin"
+              required 
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Password Baru</label>
+              <input 
+                type="password" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Password baru (min. 4 karakter)"
+                required 
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Konfirmasi Password Baru</label>
+              <input 
+                type="password" 
+                value={confirmPassword} 
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Ketik ulang password baru"
+                required 
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={changeOwnPasswordLoading}
+            style={{ 
+              width: '100%', 
+              padding: '0.85rem 1rem', 
+              borderRadius: '8px', 
+              border: 'none', 
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', 
+              color: '#ffffff', 
+              fontWeight: 700, 
+              fontSize: '0.9rem', 
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+            }}
+          >
+            {changeOwnPasswordLoading ? 'Memproses Perubahan...' : '💾 Simpan Password Baru Super Admin'}
+          </button>
+        </form>
+      </div>
       </div>
 
       {/* DANGER ZONE CARD: RESET GLOBAL DATA OPERASIONAL TOKO */}
