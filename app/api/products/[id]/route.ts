@@ -3,12 +3,29 @@ import { getSession } from '@/lib/auth';
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
-    const data = await req.json();
-    
-    // We shouldn't update the `id` field and relation fields, so we extract them out
-    const { id, createdAt, updatedAt, _count, category, ...updateData } = data;
+    const session = await getSession();
+    if (!session) {
+      return Response.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Convert price and cost to numbers if they are strings
+    // CASHIER tidak boleh edit produk
+    if (session.role === 'CASHIER') {
+      return Response.json({ success: false, message: 'Akses ditolak. Kasir tidak dapat mengubah data produk.' }, { status: 403 });
+    }
+
+    const data = await req.json();
+
+    // Strip semua field yang bukan kolom produk (relasi, computed, metadata)
+    const {
+      id, createdAt, updatedAt,
+      _count, category,
+      purchaseItems, returnItems, transactionItems,
+      totalBought, totalReturned, totalSold,
+      storeId,           // jangan izinkan pindah toko lewat edit
+      ...updateData
+    } = data;
+
+    // Convert angka
     if (updateData.price !== undefined) updateData.price = Number(updateData.price);
     if (updateData.cost !== undefined) updateData.cost = Number(updateData.cost);
     if (updateData.stock !== undefined) updateData.stock = Number(updateData.stock);
@@ -20,9 +37,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     });
 
     return Response.json({ success: true, product });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update Product Error:", error);
-    return Response.json({ success: false, message: "Gagal menyimpan perubahan produk" }, { status: 500 });
+    return Response.json({ success: false, message: error?.message || "Gagal menyimpan perubahan produk" }, { status: 500 });
   }
 }
 
