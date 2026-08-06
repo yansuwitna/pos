@@ -2,9 +2,15 @@ import { prisma } from '@/lib/prisma';
 import LoginClient from './login-client';
 
 export default async function Home() {
-  const admin = await prisma.user.findFirst({
-    where: { role: 'SUPER_ADMIN' }
-  });
+  let adminExists = false;
+  try {
+    const admin = await prisma.user.findFirst({
+      where: { role: 'SUPER_ADMIN' }
+    });
+    adminExists = !!admin;
+  } catch (error) {
+    console.error('Error querying super admin on home page:', error);
+  }
 
-  return <LoginClient adminExists={!!admin} />;
+  return <LoginClient adminExists={adminExists} />;
 }

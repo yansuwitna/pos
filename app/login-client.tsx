@@ -78,28 +78,31 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
   // Tampilan Form Buat Admin Pertama Kali
   if (!adminExists) {
     return (
-      <div className="container" style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div className="card" style={{ width: "100%", maxWidth: "420px", padding: "2.5rem" }}>
+      <div className="container" style={{ minHeight: "85vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem 1rem" }}>
+        <div className="card" style={{ width: "100%", maxWidth: "440px", padding: "2.5rem", borderRadius: "16px", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.08)", border: "1px solid #e2e8f0" }}>
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <h1 className="gradient-text" style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>Setup Awal POSPro (Super Admin)</h1>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Sistem belum memiliki Super Admin. Silakan buat akun Super Admin pertama Anda.</p>
+            <span style={{ display: 'inline-block', background: '#eff6ff', color: '#1d4ed8', fontSize: '0.8rem', fontWeight: 'bold', padding: '4px 14px', borderRadius: '20px', marginBottom: '0.75rem' }}>
+              👑 Setup Awal Sistem
+            </span>
+            <h1 className="gradient-text" style={{ fontSize: "1.8rem", marginBottom: "0.5rem", fontWeight: 800 }}>Daftarkan Super Admin</h1>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.5 }}>Sistem belum memiliki Super Admin. Silakan daftarkan akun Super Admin pertama Anda.</p>
           </div>
           
-          {error && <div style={{ color: '#ef4444', backgroundColor: '#fef2f2', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500' }}>{error}</div>}
+          {error && <div style={{ color: '#ef4444', backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontWeight: '500', fontSize: '0.88rem' }}>{error}</div>}
 
           <form onSubmit={handleCreateAdmin}>
             <div className="form-group">
-              <label>Nama Lengkap</label>
-              <input type="text" placeholder="Budi Santoso" value={name} onChange={e => setName(e.target.value)} required />
+              <label>Nama Lengkap Super Admin</label>
+              <input type="text" placeholder="Administrator Utama" value={name} onChange={e => setName(e.target.value)} required />
             </div>
 
             <div className="form-group">
-              <label>Username</label>
-              <input type="text" placeholder="admin" value={username} onChange={e => setUsername(e.target.value)} required />
+              <label>Username Login</label>
+              <input type="text" placeholder="superadmin" value={username} onChange={e => setUsername(e.target.value)} required />
             </div>
             
             <div className="form-group">
-              <label>Password</label>
+              <label>Password Login</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input 
                   type={showPassword ? 'text' : 'password'} 
@@ -129,8 +132,8 @@ export default function LoginClient({ adminExists: initialAdminExists }: Props) 
               </div>
             </div>
             
-            <button className="btn w-full mt-4" type="submit" disabled={loading}>
-              {loading ? 'Memproses...' : 'Buat Akun Super Admin & Masuk'}
+            <button className="btn w-full mt-4" type="submit" disabled={loading} style={{ padding: '0.85rem', fontWeight: 'bold', fontSize: '0.95rem' }}>
+              {loading ? 'Memproses Setup...' : '✨ Buat Akun Super Admin & Masuk'}
             </button>
           </form>
         </div>

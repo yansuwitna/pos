@@ -30,6 +30,44 @@ export default function SettingsClient({ role }: Props) {
 
   const [printerType, setPrinterType] = useState('kabel'); // 'kabel' or 'bluetooth'
 
+  // State Change Password
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return Swal.fire('Perhatian', 'Harap isi semua bidang password', 'warning');
+    }
+    if (newPassword !== confirmPassword) {
+      return Swal.fire('Tidak Cocok', 'Konfirmasi password baru tidak cocok', 'error');
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      const res = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword })
+      });
+      const data = await res.json();
+      setChangePasswordLoading(false);
+      if (res.ok && data.success) {
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        Swal.fire('Berhasil!', data.message || 'Password Anda berhasil diperbarui.', 'success');
+      } else {
+        Swal.fire('Gagal', data.message || 'Gagal merubah password.', 'error');
+      }
+    } catch (err) {
+      setChangePasswordLoading(false);
+      Swal.fire('Error', 'Terjadi kesalahan sistem saat merubah password.', 'error');
+    }
+  };
+
   useEffect(() => {
     // Camera API
     Html5Qrcode.getCameras()
@@ -419,14 +457,66 @@ export default function SettingsClient({ role }: Props) {
         </div>
       )}
 
-      {/* === INFO AKUN === */}
+      {/* === INFO AKUN & UBAH PASSWORD SAYA === */}
       <div className="card" style={{ marginTop: '1.5rem' }}>
-        <h2 className="card-title">👤 Akun Saya</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-          Role Anda: <strong>{role}</strong>. Untuk mengubah password atau informasi akun, hubungi Admin.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <h2 className="card-title" style={{ margin: 0 }}>👤 Akun Saya</h2>
+          <span style={{ padding: '4px 12px', borderRadius: '20px', background: '#eff6ff', color: '#1d4ed8', fontSize: '0.8rem', fontWeight: 'bold' }}>
+            Role: {role}
+          </span>
+        </div>
+
+        <form onSubmit={handleChangePassword} style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            🔑 Ubah Password Saya
+          </h3>
+
+          <div className="form-group">
+            <label>Password Saat Ini</label>
+            <input 
+              type="password" 
+              value={currentPassword} 
+              onChange={e => setCurrentPassword(e.target.value)}
+              placeholder="Masukkan password lama Anda"
+              required 
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Password Baru</label>
+              <input 
+                type="password" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Password baru (min. 4 karakter)"
+                required 
+              />
+            </div>
+            <div className="form-group">
+              <label>Konfirmasi Password Baru</label>
+              <input 
+                type="password" 
+                value={confirmPassword} 
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Ketik ulang password baru"
+                required 
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={changePasswordLoading}
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '0.75rem', fontWeight: 'bold', marginTop: '0.5rem' }}
+          >
+            {changePasswordLoading ? 'Memproses Perubahan...' : '💾 Simpan Password Baru Saya'}
+          </button>
+        </form>
+
         <a href="/api/auth/logout" style={{ textDecoration: 'none' }}>
-          <button className="btn w-full" style={{ background: '#ef4444', fontSize: '1rem', padding: '0.85rem' }}>
+          <button className="btn w-full" style={{ background: '#ef4444', fontSize: '1rem', padding: '0.85rem', fontWeight: 'bold' }}>
             🚪 Keluar / Logout
           </button>
         </a>
