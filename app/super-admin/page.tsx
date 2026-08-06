@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 
 export default function SuperAdminPage() {
+  const router = useRouter();
   const [stores, setStores] = useState([]);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const [allowPublic, setAllowPublic] = useState(false);
@@ -504,8 +506,8 @@ export default function SuperAdminPage() {
       />
 
       <div style={{ marginBottom: "1.5rem" }}>
-        <h1 className="gradient-text" style={{ fontSize: "2rem" }}>Dashboard Super Admin</h1>
-        <p style={{ color: "var(--text-muted)" }}>Kelola sistem Multi-Toko, Performa Keuangan Global, dan Pengaturan Sistem</p>
+        <h1 className="gradient-text" style={{ fontSize: "2rem" }}>Dashboard</h1>
+        <p style={{ color: "var(--text-muted)" }}>Kelola sistem Multi-Toko dan Performa Keuangan Global</p>
       </div>
 
       {/* RINGKASAN GLOBAL SEMUA TOKO */}
@@ -565,8 +567,9 @@ export default function SuperAdminPage() {
           <table>
             <thead>
               <tr>
+                <th style={{ minWidth: '150px' }}>Aksi</th>
                 <th>Kode</th>
-                <th>Nama Toko</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Nama Toko</th>
                 <th style={{ textAlign: 'center' }}>User</th>
                 <th style={{ textAlign: 'center' }}>Barang</th>
                 <th style={{ textAlign: 'center' }}>Transaksi</th>
@@ -578,14 +581,50 @@ export default function SuperAdminPage() {
                 <th>Total Piutang</th>
                 <th>Status</th>
                 <th>Tanggal Dibuat</th>
-                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {stores.map((store: any) => (
                 <tr key={store.id}>
+                  <td style={{ minWidth: '150px' }}>
+                    <select 
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        if (val === 'activity') router.push(`/super-admin/stores/${store.id}/activities`);
+                        if (val === 'password') handleOpenPasswordModal(store);
+                        if (val === 'backup') handleBackupStore(store);
+                        if (val === 'restore') handleTriggerRestoreStore(store);
+                        if (val === 'clear') handleOpenClearModal(store);
+                        if (val === 'delete') handleOpenDeleteModal(store);
+                      }}
+                      style={{
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        minWidth: '140px',
+                        width: '100%'
+                      }}
+                    >
+                      <option value="" disabled>Pilih Aksi</option>
+                      <option value="activity">👁️ Pantau Kegiatan</option>
+                      <option value="password">🔑 Password</option>
+                      <option value="backup">💾 Backup Toko</option>
+                      <option value="restore">⬆️ Restore Toko</option>
+                      <option value="clear">🧹 Kosongkan Data</option>
+                      <option value="delete">🗑️ Hapus Toko</option>
+                    </select>
+                  </td>
                   <td><strong>{store.code}</strong></td>
-                  <td style={{ fontWeight: 600 }}>{store.name}</td>
+                  <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{store.name}</td>
                   <td style={{ textAlign: 'center' }}>
                     <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '600', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
                       {store._count?.users ?? 0}
@@ -625,45 +664,6 @@ export default function SuperAdminPage() {
                     </span>
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>{new Date(store.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      <button 
-                        onClick={() => handleOpenPasswordModal(store)}
-                        title="Ubah Password Akun Toko Ini"
-                        style={{ background: '#10b981', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                      >
-                        🔑 Password
-                      </button>
-                      <button 
-                        onClick={() => handleBackupStore(store)}
-                        title="Unduh Backup Toko Ini"
-                        style={{ background: '#0284c7', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                      >
-                        💾 Backup
-                      </button>
-                      <button 
-                        onClick={() => handleTriggerRestoreStore(store)}
-                        title="Restore Backup ke Toko Ini"
-                        style={{ background: '#8b5cf6', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                      >
-                        ⬆️ Restore
-                      </button>
-                      <button 
-                        onClick={() => handleOpenClearModal(store)}
-                        title="Kosongkan Data Toko"
-                        style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                      >
-                        Kosongkan
-                      </button>
-                      <button 
-                        onClick={() => handleOpenDeleteModal(store)}
-                        title="Hapus Toko Permanen"
-                        style={{ background: '#ef4444', color: 'white', border: 'none', padding: '0.4rem 0.6rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-                      >
-                        🗑️ Hapus
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
               {stores.length === 0 && (
@@ -676,76 +676,6 @@ export default function SuperAdminPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* PENGATURAN SISTEM & BACKUP GLOBAL */}
-      <div className="grid-2">
-          <div className="card">
-            <h2 className="card-title">Pengaturan Sistem</h2>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <p style={{ marginBottom: '1rem', color: "var(--text-muted)" }}>
-                Apakah publik (siapapun) diizinkan mendaftar toko baru melalui halaman registrasi?
-              </p>
-              <button 
-                onClick={togglePublicRegistration}
-                className="btn w-full"
-                style={{ backgroundColor: allowPublic ? 'var(--accent)' : '#ef4444' }}
-              >
-                {allowPublic ? 'Pendaftaran Dibuka (Klik untuk Tutup)' : 'Pendaftaran Ditutup (Klik untuk Buka)'}
-              </button>
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className="card-title">💾 Backup & Restore Database System</h2>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
-              Ekspor seluruh database (seluruh toko, transaksi, produk, dan pengaturan global) atau pulihkan dari file JSON backup.
-            </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <button 
-                onClick={handleBackupSystem}
-                disabled={backupLoading}
-                className="btn btn-success"
-                style={{ width: '100%', padding: '0.75rem' }}
-              >
-                ⬇️ Unduh Full Backup System (.json)
-              </button>
-
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleRestoreSystem} 
-                accept=".json" 
-                style={{ display: 'none' }} 
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={backupLoading}
-                className="btn"
-                style={{ width: '100%', padding: '0.75rem', backgroundColor: '#dc2626' }}
-              >
-                ⬆️ Pulihkan System dari File Backup
-              </button>
-            </div>
-          </div>
-      </div>
-
-      {/* DANGER ZONE GLOBAL: KOSONGKAN SEMUA DATA TOKO */}
-      <div className="card" style={{ marginTop: '1.5rem', border: '2px solid #ef4444' }}>
-        <h2 className="card-title" style={{ color: '#ef4444' }}>⚠️ Kosongkan Semua Data Toko (Global Reset)</h2>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.25rem" }}>
-          Tindakan ini akan menghapus seluruh data operasional (Barang, Kategori, Transaksi, Laporan Keuangan, Kasir & Gudang) di <strong>SEMUA TOKO</strong>. 
-          <br/>
-          <strong style={{ color: '#166534' }}>✅ Informasi Toko & Akun Manager (ADMIN) setiap toko AKAN TETAP DIPERTAHANKAN.</strong>
-        </p>
-        <button 
-          onClick={handleResetAllStores}
-          className="btn"
-          style={{ backgroundColor: '#ef4444', width: '100%', padding: '0.85rem', fontWeight: 'bold', fontSize: '0.95rem' }}
-        >
-          🗑️ Kosongkan Semua Data Toko (Pertahankan Informasi Toko & Manager)
-        </button>
       </div>
 
       {/* Modal Tambah Toko */}
