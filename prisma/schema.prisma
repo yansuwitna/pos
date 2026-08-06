@@ -3,20 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum Role {
-  SUPER_ADMIN
-  ADMIN      // Laporan & Manajemen User
-  CASHIER    // Transaksi POS saja
-  WAREHOUSE  // Input Barang saja
-}
-
-enum ItemType {
-  GOODS
-  SERVICE
 }
 
 model SystemSetting {
@@ -34,7 +22,7 @@ model Store {
   address   String?
   phone     String?
   greeting  String?
-  logo      String?  @db.LongText
+  logo      String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,7 +48,7 @@ model User {
   id        String   @id @default(cuid())
   username  String   @unique
   password  String
-  role      Role     @default(CASHIER)
+  role      String   @default("CASHIER")
   name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -96,7 +84,7 @@ model Product {
   store           Store     @relation(fields: [storeId], references: [id])
   sku             String?   
   name            String
-  type            ItemType  @default(GOODS)
+  type            String    @default("GOODS")
   price           Float
   cost            Float
   stock           Int       @default(0)
@@ -128,12 +116,6 @@ model Customer {
   transactions Transaction[]
 }
 
-enum PaymentStatus {
-  PAID
-  UNPAID
-  PARTIAL
-}
-
 model Transaction {
   id          String   @id @default(cuid())
   storeId     String
@@ -153,7 +135,7 @@ model Transaction {
   // Hutang Pelanggan (Piutang Toko)
   customerId    String?
   customer      Customer? @relation(fields: [customerId], references: [id])
-  paymentStatus PaymentStatus @default(PAID)
+  paymentStatus String    @default("PAID")
   amountPaid    Float     @default(0)
   dueDate       DateTime?
   
@@ -199,8 +181,8 @@ model Purchase {
   items       PurchaseItem[]
 
   // Hutang ke Supplier
-  paymentStatus PaymentStatus @default(PAID)
-  amountPaid    Float         @default(0)
+  paymentStatus String   @default("PAID")
+  amountPaid    Float    @default(0)
   dueDate       DateTime?
   
   debtPayments  DebtPayment[]
@@ -215,7 +197,7 @@ model DebtPayment {
   amount      Float
   date        DateTime @default(now())
   notes       String?
-  userId        String?
+  userId      String?
   user        User?    @relation(fields: [userId], references: [id])
 }
 

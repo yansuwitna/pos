@@ -200,57 +200,57 @@ export async function POST(req: Request) {
         const customers = prepareData(backupData.customers);
         const products = prepareData(backupData.products);
 
-        if (categories.length > 0) await tx.category.createMany({ data: categories, skipDuplicates: true });
-        if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers, skipDuplicates: true });
-        if (customers.length > 0) await tx.customer.createMany({ data: customers, skipDuplicates: true });
-        if (products.length > 0) await tx.product.createMany({ data: products, skipDuplicates: true });
+        if (categories.length > 0) await tx.category.createMany({ data: categories });
+        if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers });
+        if (customers.length > 0) await tx.customer.createMany({ data: customers });
+        if (products.length > 0) await tx.product.createMany({ data: products });
 
         if (backupData.users?.length > 0) {
           const usersToInsert = prepareData(backupData.users).filter((u: any) => u.role !== 'ADMIN' && u.role !== 'SUPER_ADMIN');
-          if (usersToInsert.length > 0) await tx.user.createMany({ data: usersToInsert, skipDuplicates: true });
+          if (usersToInsert.length > 0) await tx.user.createMany({ data: usersToInsert });
         }
 
         const transactions = prepareData(backupData.transactions);
         const transactionItems = formatBackupDates(backupData.transactionItems);
         const receivablePayments = prepareData(backupData.receivablePayments);
 
-        if (transactions.length > 0) await tx.transaction.createMany({ data: transactions, skipDuplicates: true });
-        if (transactionItems.length > 0) await tx.transactionItem.createMany({ data: transactionItems, skipDuplicates: true });
-        if (receivablePayments.length > 0) await tx.receivablePayment.createMany({ data: receivablePayments, skipDuplicates: true });
+        if (transactions.length > 0) await tx.transaction.createMany({ data: transactions });
+        if (transactionItems.length > 0) await tx.transactionItem.createMany({ data: transactionItems });
+        if (receivablePayments.length > 0) await tx.receivablePayment.createMany({ data: receivablePayments });
 
         const purchases = prepareData(backupData.purchases);
         const purchaseItems = formatBackupDates(backupData.purchaseItems);
         const debtPayments = prepareData(backupData.debtPayments);
 
-        if (purchases.length > 0) await tx.purchase.createMany({ data: purchases, skipDuplicates: true });
-        if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems, skipDuplicates: true });
-        if (debtPayments.length > 0) await tx.debtPayment.createMany({ data: debtPayments, skipDuplicates: true });
+        if (purchases.length > 0) await tx.purchase.createMany({ data: purchases });
+        if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems });
+        if (debtPayments.length > 0) await tx.debtPayment.createMany({ data: debtPayments });
 
         const returns = prepareData(backupData.returns);
         const returnItems = formatBackupDates(backupData.returnItems);
 
-        if (returns.length > 0) await tx.return.createMany({ data: returns, skipDuplicates: true });
-        if (returnItems.length > 0) await tx.returnItem.createMany({ data: returnItems, skipDuplicates: true });
+        if (returns.length > 0) await tx.return.createMany({ data: returns });
+        if (returnItems.length > 0) await tx.returnItem.createMany({ data: returnItems });
 
         const orders = prepareData(backupData.orders);
         const orderItems = formatBackupDates(backupData.orderItems);
 
-        if (orders.length > 0) await tx.order.createMany({ data: orders, skipDuplicates: true });
-        if (orderItems.length > 0) await tx.orderItem.createMany({ data: orderItems, skipDuplicates: true });
+        if (orders.length > 0) await tx.order.createMany({ data: orders });
+        if (orderItems.length > 0) await tx.orderItem.createMany({ data: orderItems });
 
         const stockOpnames = prepareData(backupData.stockOpnames);
         const stockOpnameItems = formatBackupDates(backupData.stockOpnameItems);
 
-        if (stockOpnames.length > 0) await tx.stockOpname.createMany({ data: stockOpnames, skipDuplicates: true });
-        if (stockOpnameItems.length > 0) await tx.stockOpnameItem.createMany({ data: stockOpnameItems, skipDuplicates: true });
+        if (stockOpnames.length > 0) await tx.stockOpname.createMany({ data: stockOpnames });
+        if (stockOpnameItems.length > 0) await tx.stockOpnameItem.createMany({ data: stockOpnameItems });
 
         const expenses = prepareData(backupData.expenses);
         const discountRules = prepareData(backupData.discountRules);
         const capitals = prepareData(backupData.capitals);
 
-        if (expenses.length > 0) await tx.expense.createMany({ data: expenses, skipDuplicates: true });
-        if (discountRules.length > 0) await tx.discountRule.createMany({ data: discountRules, skipDuplicates: true });
-        if (capitals.length > 0) await tx.capital.createMany({ data: capitals, skipDuplicates: true });
+        if (expenses.length > 0) await tx.expense.createMany({ data: expenses });
+        if (discountRules.length > 0) await tx.discountRule.createMany({ data: discountRules });
+        if (capitals.length > 0) await tx.capital.createMany({ data: capitals });
       } else {
         // --- RESTORE SUPER ADMIN (FULL SYSTEM WIPE & RESTORE) ---
         await tx.transactionItem.deleteMany();
@@ -288,55 +288,55 @@ export async function POST(req: Request) {
         const customers = formatBackupDates(backupData.customers);
         const products = formatBackupDates(backupData.products);
 
-        if (stores.length > 0) await tx.store.createMany({ data: stores, skipDuplicates: true });
-        if (systemSettings.length > 0) await tx.systemSetting.createMany({ data: systemSettings, skipDuplicates: true });
-        if (users.length > 0) await tx.user.createMany({ data: users, skipDuplicates: true });
-        if (categories.length > 0) await tx.category.createMany({ data: categories, skipDuplicates: true });
-        if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers, skipDuplicates: true });
-        if (customers.length > 0) await tx.customer.createMany({ data: customers, skipDuplicates: true });
-        if (products.length > 0) await tx.product.createMany({ data: products, skipDuplicates: true });
+        if (stores.length > 0) await tx.store.createMany({ data: stores });
+        if (systemSettings.length > 0) await tx.systemSetting.createMany({ data: systemSettings });
+        if (users.length > 0) await tx.user.createMany({ data: users });
+        if (categories.length > 0) await tx.category.createMany({ data: categories });
+        if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers });
+        if (customers.length > 0) await tx.customer.createMany({ data: customers });
+        if (products.length > 0) await tx.product.createMany({ data: products });
 
         const transactions = formatBackupDates(backupData.transactions);
         const transactionItems = formatBackupDates(backupData.transactionItems);
         const receivablePayments = formatBackupDates(backupData.receivablePayments);
 
-        if (transactions.length > 0) await tx.transaction.createMany({ data: transactions, skipDuplicates: true });
-        if (transactionItems.length > 0) await tx.transactionItem.createMany({ data: transactionItems, skipDuplicates: true });
-        if (receivablePayments.length > 0) await tx.receivablePayment.createMany({ data: receivablePayments, skipDuplicates: true });
+        if (transactions.length > 0) await tx.transaction.createMany({ data: transactions });
+        if (transactionItems.length > 0) await tx.transactionItem.createMany({ data: transactionItems });
+        if (receivablePayments.length > 0) await tx.receivablePayment.createMany({ data: receivablePayments });
 
         const purchases = formatBackupDates(backupData.purchases);
         const purchaseItems = formatBackupDates(backupData.purchaseItems);
         const debtPayments = formatBackupDates(backupData.debtPayments);
 
-        if (purchases.length > 0) await tx.purchase.createMany({ data: purchases, skipDuplicates: true });
-        if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems, skipDuplicates: true });
-        if (debtPayments.length > 0) await tx.debtPayment.createMany({ data: debtPayments, skipDuplicates: true });
+        if (purchases.length > 0) await tx.purchase.createMany({ data: purchases });
+        if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems });
+        if (debtPayments.length > 0) await tx.debtPayment.createMany({ data: debtPayments });
 
         const returns = formatBackupDates(backupData.returns);
         const returnItems = formatBackupDates(backupData.returnItems);
 
-        if (returns.length > 0) await tx.return.createMany({ data: returns, skipDuplicates: true });
-        if (returnItems.length > 0) await tx.returnItem.createMany({ data: returnItems, skipDuplicates: true });
+        if (returns.length > 0) await tx.return.createMany({ data: returns });
+        if (returnItems.length > 0) await tx.returnItem.createMany({ data: returnItems });
 
         const orders = formatBackupDates(backupData.orders);
         const orderItems = formatBackupDates(backupData.orderItems);
 
-        if (orders.length > 0) await tx.order.createMany({ data: orders, skipDuplicates: true });
-        if (orderItems.length > 0) await tx.orderItem.createMany({ data: orderItems, skipDuplicates: true });
+        if (orders.length > 0) await tx.order.createMany({ data: orders });
+        if (orderItems.length > 0) await tx.orderItem.createMany({ data: orderItems });
 
         const stockOpnames = formatBackupDates(backupData.stockOpnames);
         const stockOpnameItems = formatBackupDates(backupData.stockOpnameItems);
 
-        if (stockOpnames.length > 0) await tx.stockOpname.createMany({ data: stockOpnames, skipDuplicates: true });
-        if (stockOpnameItems.length > 0) await tx.stockOpnameItem.createMany({ data: stockOpnameItems, skipDuplicates: true });
+        if (stockOpnames.length > 0) await tx.stockOpname.createMany({ data: stockOpnames });
+        if (stockOpnameItems.length > 0) await tx.stockOpnameItem.createMany({ data: stockOpnameItems });
 
         const expenses = formatBackupDates(backupData.expenses);
         const discountRules = formatBackupDates(backupData.discountRules);
         const capitals = formatBackupDates(backupData.capitals);
 
-        if (expenses.length > 0) await tx.expense.createMany({ data: expenses, skipDuplicates: true });
-        if (discountRules.length > 0) await tx.discountRule.createMany({ data: discountRules, skipDuplicates: true });
-        if (capitals.length > 0) await tx.capital.createMany({ data: capitals, skipDuplicates: true });
+        if (expenses.length > 0) await tx.expense.createMany({ data: expenses });
+        if (discountRules.length > 0) await tx.discountRule.createMany({ data: discountRules });
+        if (capitals.length > 0) await tx.capital.createMany({ data: capitals });
       }
     }, {
       maxWait: 15000,
