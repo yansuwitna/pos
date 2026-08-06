@@ -58,12 +58,23 @@ export async function POST(req: Request) {
     }
 
     let totalCost = 0;
+
+    // Validate all items have a productId
+    for (const item of items) {
+      const pid = item.productId ?? item.id;
+      if (!pid) {
+        return Response.json({ success: false, message: "Produk tidak valid — pastikan semua item dipilih dari daftar produk." }, { status: 400 });
+      }
+    }
+
     const purchaseItemsData = items.map((item: any) => {
+      const pid = item.productId ?? item.id;
+      const pname = item.productName ?? item.name ?? '';
       const subtotal = item.quantity * item.unitCost;
       totalCost += subtotal;
       return {
-        productId: item.id,
-        productName: item.name,
+        product: { connect: { id: pid } },
+        productName: pname,
         quantity: item.quantity,
         unitCost: item.unitCost,
         subtotal: subtotal
@@ -109,8 +120,9 @@ export async function POST(req: Request) {
 
       // 2. Update stock dan cost setiap produk menggunakan rata-rata bergerak (Moving Average)
       for (const item of items) {
+        const pid = item.productId ?? item.id;
         const currentProduct = await tx.product.findUnique({
-          where: { id: item.id }
+          where: { id: pid }
         });
         
         if (currentProduct && currentProduct.type === 'GOODS') {
@@ -124,7 +136,7 @@ export async function POST(req: Request) {
           }
           
           await tx.product.update({
-            where: { id: item.id },
+            where: { id: pid },
             data: {
               stock: newStock,
               cost: newCost
