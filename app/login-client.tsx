@@ -177,6 +177,8 @@ export default function LoginClient({ adminExists: initialAdminExists, initialSt
         fontFamily: "'Poppins', sans-serif"
       }}>
 
+
+
       {/* LOGIN CARD CONTAINER (BRIGHT GLASSMORPHISM) */}
       <div style={{
         width: '100%',
@@ -548,6 +550,25 @@ export default function LoginClient({ adminExists: initialAdminExists, initialSt
           >
             Daftar Toko Baru &rarr;
           </a>
+          <div style={{ marginTop: '0.75rem', borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem' }}>
+            <a
+              href="/panduan"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                color: '#7c3aed',
+                fontWeight: 700,
+                fontSize: '0.87rem',
+                textDecoration: 'underline',
+                textUnderlineOffset: '3px',
+              }}
+            >
+              📖 Panduan Penggunaan ↗
+            </a>
+          </div>
         </div>
       </div>
       </div>
