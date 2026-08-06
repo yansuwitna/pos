@@ -36,7 +36,9 @@ export default function OrderPage() {
   const [showForm, setShowForm] = useState(false);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [printData, setPrintData] = useState<any>(null);
+  const [selectedDetail, setSelectedDetail] = useState<any>(null);
   const [tableLoading, setTableLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Modal Barang Baru
   const [showNewItemModal, setShowNewItemModal] = useState(false);
@@ -47,6 +49,13 @@ export default function OrderPage() {
     fetchProducts();
     fetchSuppliers();
     fetchHistory();
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(u => {
+        if (u.success) setUserRole(u.role || u.user?.role);
+      })
+      .catch(() => {});
+
     const savedCam = localStorage.getItem('pos_camera_id');
     if (savedCam) setSelectedCamera(savedCam);
     
@@ -181,6 +190,7 @@ export default function OrderPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer hanya memiliki akses lihat data.', 'warning');
     const result = await Swal.fire({
       title: 'Hapus Pesanan (PO)?',
       text: 'Data PO akan dihapus secara permanen. Lanjutkan?',
@@ -205,6 +215,7 @@ export default function OrderPage() {
   };
 
   const submitOrder = async () => {
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer hanya memiliki akses lihat data.', 'warning');
     if (cart.length === 0) return Swal.fire('Peringatan', "Belum ada barang untuk dipesan.", 'warning');
     if (!selectedSupplier) return Swal.fire('Peringatan', "Supplier harus dipilih untuk surat pemesanan.", 'warning');
 
@@ -263,7 +274,7 @@ export default function OrderPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📜 Riwayat Pesanan (PO)</h2>
-          {!showForm && (
+          {!showForm && userRole !== 'ADMIN' && (
             <button className="btn btn-success" onClick={() => {
               setCart([]);
               setSelectedSupplier('');
@@ -299,28 +310,35 @@ export default function OrderPage() {
                   <td style={{ fontWeight: 600 }}>{h.supplier?.name || '-'}</td>
                   <td>{h.items.length} Macam</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => {
-                        setEditOrder(h);
-                        setSelectedSupplier(h.supplierId || '');
-                        setNotes(h.notes || '');
-                        setOrderDate(new Date(h.createdAt).toISOString().split('T')[0]);
-                        // Reconstruct cart
-                        const rebuiltCart = h.items.map((item: any) => {
-                          const p = products.find(x => x.id === item.productId);
-                          return {
-                            product: p || { id: item.productId, name: item.productName, sku: '', stock: 0 },
-                            quantity: item.quantity
-                          };
-                        });
-                        setCart(rebuiltCart);
-                        setShowForm(true);
-                      }}>
-                        ✏️ Edit PO
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: '#0284c7', color: '#0284c7' }} onClick={() => setSelectedDetail(h)}>
+                        👁️ Detail
                       </button>
-                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
-                        Hapus
-                      </button>
+                      {userRole !== 'ADMIN' && (
+                        <>
+                          <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => {
+                            setEditOrder(h);
+                            setSelectedSupplier(h.supplierId || '');
+                            setNotes(h.notes || '');
+                            setOrderDate(new Date(h.createdAt).toISOString().split('T')[0]);
+                            // Reconstruct cart
+                            const rebuiltCart = h.items.map((item: any) => {
+                              const p = products.find(x => x.id === item.productId);
+                              return {
+                                product: p || { id: item.productId, name: item.productName, sku: '', stock: 0 },
+                                quantity: item.quantity
+                              };
+                            });
+                            setCart(rebuiltCart);
+                            setShowForm(true);
+                          }}>
+                            ✏️ Edit PO
+                          </button>
+                          <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
+                            Hapus
+                          </button>
+                        </>
+                      )}
                       <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => handlePrint(h)}>
                         🖨️ Cetak PO
                       </button>
@@ -336,21 +354,28 @@ export default function OrderPage() {
 
       {showForm && (
         <div className="modal-overlay">
-          <div className="modal-content large" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div className="modal-content large" style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+            gap: '1.5rem', 
+            alignItems: 'start',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
               <div className="modal-header">
                 <h2 className="modal-title">
-                  {editOrder ? '✏️ Edit Pesanan (PO)' : '🔙 Form Pemesanan Baru'}
+                  {editOrder ? '✏️ Edit Pesanan (PO)' : '📝 Form Pemesanan Baru'}
                 </h2>
                 <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditOrder(null); }}>Tutup</button>
               </div>
               
               <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
-                <p style={{ color: '#0369a1', background: '#e0f2fe', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #bae6fd' }}>
+                <p style={{ color: '#0369a1', background: '#e0f2fe', padding: '0.85rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', border: '1px solid #bae6fd' }}>
                   ℹ️ Pesanan yang dibuat di sini <strong>TIDAK AKAN</strong> mengubah jumlah stok di sistem. Hanya untuk mencetak dokumen Surat Pesanan (PO) ke Supplier.
                 </p>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>Tanggal PO</label>
                     <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} required />
@@ -374,7 +399,7 @@ export default function OrderPage() {
                       </button>
                     )
                   ) : (
-                    <div style={{ color: '#166534', background: '#f0fdf4', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1.5rem' }}>
+                    <div style={{ color: '#166534', background: '#f0fdf4', padding: '0.85rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1rem' }}>
                       🔫 Scanner Alat Aktif! Tembakkan barcode.
                     </div>
                   )}
@@ -385,41 +410,38 @@ export default function OrderPage() {
                     </div>
                   )}
                   
-                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>Cari Manual (Ketik Nama / SKU)</label>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                      <div style={{ flex: '1 1 200px' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
                         <ProductSearch products={products} onSelect={addToCart} />
                       </div>
-                      <button className="btn" style={{ background: '#10b981', color: 'white', flex: '0 0 auto' }} onClick={() => setShowNewItemModal(true)}>
+                      <button className="btn" style={{ background: '#10b981', color: 'white', flex: '1 1 auto', whiteSpace: 'nowrap' }} onClick={() => setShowNewItemModal(true)}>
                         ➕ Pesan Barang Baru
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Dipesan:</h3>
+                <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Dipesan:</h3>
                 
                 {cart.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>Daftar pesanan masih kosong.</p>
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>Daftar pesanan masih kosong.</p>
                 ) : (
                   <div>
                     {cart.map((item, idx) => (
-                      <div key={idx} style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-                        <div style={{ flex: '1 1 200px' }}>
-                          <div style={{ fontWeight: 600 }}>{item.product.name}</div>
+                      <div key={idx} style={{ background: 'var(--bg)', padding: '0.85rem', borderRadius: '8px', marginBottom: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--border)' }}>
+                        <div style={{ flex: '1 1 150px' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{item.product.name}</div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>SKU: {item.product.sku || '-'}</div>
                         </div>
                         
-                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 100px' }}>
-                          <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jumlah (Qty)</label>
-                            <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1))} onFocus={e => e.target.select()} style={{ padding: '0.4rem' }} />
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: '0 1 auto' }}>
+                          <div style={{ width: '90px' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Qty</label>
+                            <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1))} onFocus={e => e.target.select()} style={{ padding: '0.35rem 0.5rem', width: '100%' }} />
                           </div>
-                        </div>
-
-                        <div style={{ flex: '0 0 auto' }}>
-                          <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>❌</button>
+                          <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.45rem 0.65rem', color: '#ef4444', borderColor: '#ef4444', marginTop: '1rem' }} title="Hapus">❌</button>
                         </div>
                       </div>
                     ))}
@@ -437,11 +459,11 @@ export default function OrderPage() {
               </div>
             </div>
             
-            <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', height: '100%', overflowY: 'auto' }}>
-              <h2 className="card-title">📦 Info Stok Saat Ini</h2>
+            <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
+              <h2 className="card-title" style={{ fontSize: '1.05rem', marginBottom: '0.5rem' }}>📦 Info Stok Saat Ini</h2>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Sebagai referensi, berikut daftar stok saat ini:</p>
-              <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <table style={{ fontSize: '0.9rem' }}>
+              <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <table style={{ fontSize: '0.85rem' }}>
                   <thead>
                     <tr>
                       <th>Nama Produk</th>
@@ -551,6 +573,61 @@ export default function OrderPage() {
             <div className="no-print" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPrintData(null)}>Tutup</button>
               <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Cetak</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail PO */}
+      {selectedDetail && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">📄 Detail Surat Pesanan (PO)</h2>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setSelectedDetail(null)}>Tutup</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                <div><strong>ID PO:</strong> PO-{selectedDetail.id.substring(0,8).toUpperCase()}</div>
+                <div><strong>Tanggal:</strong> {new Date(selectedDetail.createdAt).toLocaleDateString('id-ID')}</div>
+                <div><strong>Supplier:</strong> {selectedDetail.supplier?.name || '-'}</div>
+                <div><strong>Pemesan/User:</strong> {selectedDetail.user?.name || '-'}</div>
+              </div>
+
+              <h3 style={{ fontSize: '1rem', margin: '0.5rem 0 0 0' }}>Daftar Barang Dipesan:</h3>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Nama Barang</th>
+                      <th style={{ textAlign: 'center' }}>Jumlah (Qty)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedDetail.items?.map((item: any, idx: number) => (
+                      <tr key={idx}>
+                        <td>{idx + 1}</td>
+                        <td style={{ fontWeight: 600 }}>{item.productName || item.product?.name}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {selectedDetail.notes && (
+                <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', padding: '0.75rem', borderRadius: '8px' }}>
+                  <strong>Catatan:</strong> {selectedDetail.notes}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedDetail(null)}>Tutup</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { setPrintData(selectedDetail); setSelectedDetail(null); }}>
+                  🖨️ Cetak Dokumen PO
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -26,6 +26,8 @@ export default function OpnamePage() {
   const [showForm, setShowForm] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [printData, setPrintData] = useState<any>(null);
+  const [selectedDetail, setSelectedDetail] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
@@ -42,6 +44,13 @@ export default function OpnamePage() {
   useEffect(() => {
     fetchHistory();
     fetchProducts();
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(u => {
+        if (u.success) setUserRole(u.role || u.user?.role);
+      })
+      .catch(() => {});
+
     const savedCam = localStorage.getItem('pos_camera_id');
     if (savedCam) setSelectedCamera(savedCam);
     const mode = localStorage.getItem('pos_scanner_mode') || 'camera';
@@ -203,6 +212,7 @@ export default function OpnamePage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer hanya memiliki akses lihat data.', 'warning');
     const result = await Swal.fire({
       title: 'Hapus Riwayat Opname?',
       text: 'Riwayat akan dihapus, tetapi stok barang TIDAK akan dikembalikan.',
@@ -228,7 +238,9 @@ export default function OpnamePage() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 className="card-title" style={{ marginBottom: 0 }}>📋 Riwayat Stok Opname</h2>
-            <button className="btn btn-success" onClick={() => setShowForm(true)}>➕ Buat Opname Baru</button>
+            {userRole !== 'ADMIN' && (
+              <button className="btn btn-success" onClick={() => setShowForm(true)}>➕ Buat Opname Baru</button>
+            )}
           </div>
 
           <div className="table-container">
@@ -258,13 +270,18 @@ export default function OpnamePage() {
                     <td>{h.items.length} Macam</td>
                     <td>{h.notes || '-'}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', borderColor: '#0284c7', color: '#0284c7' }} onClick={() => setSelectedDetail(h)}>
+                          👁️ Detail
+                        </button>
                         <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handlePrint(h)}>
                           🖨️ Cetak
                         </button>
-                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
-                          Hapus
-                        </button>
+                        {userRole !== 'ADMIN' && (
+                          <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
+                            Hapus
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -276,12 +293,12 @@ export default function OpnamePage() {
         </div>
       ) : (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h2 className="card-title" style={{ marginBottom: 0 }}>📝 Buat Stok Opname Baru</h2>
             <button className="btn btn-outline" onClick={() => setShowForm(false)}>⬅️ Kembali</button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
             {/* Kiri: Pencarian Barang */}
             <div>
               <div className="form-group" style={{ position: 'relative' }}>
@@ -301,7 +318,7 @@ export default function OpnamePage() {
                     }} 
                   />
                   {scannerMode !== 'physical' && (
-                    <button className="btn btn-outline" onClick={toggleScanner}>
+                    <button className="btn btn-outline" onClick={toggleScanner} style={{ whiteSpace: 'nowrap' }}>
                       {scanning ? '❌ Tutup Kamera' : '📷 Scan'}
                     </button>
                   )}
@@ -358,18 +375,18 @@ export default function OpnamePage() {
 
             {/* Kanan: Daftar Barang Opname */}
             <div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Daftar Barang Disesuaikan</h3>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Daftar Barang Disesuaikan ({items.length})</h3>
               
               <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <table>
+                <table style={{ minWidth: '600px' }}>
                   <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>
                     <tr>
                       <th>Nama Barang</th>
-                      <th style={{ width: '100px' }}>Stok Sistem</th>
-                      <th style={{ width: '120px' }}>Stok Aktual</th>
-                      <th style={{ width: '100px' }}>Selisih</th>
+                      <th style={{ width: '90px', textAlign: 'center' }}>Stok Sistem</th>
+                      <th style={{ width: '110px', textAlign: 'center' }}>Stok Aktual</th>
+                      <th style={{ width: '80px', textAlign: 'center' }}>Selisih</th>
                       <th>Keterangan</th>
-                      <th></th>
+                      <th style={{ width: '40px' }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -415,7 +432,7 @@ export default function OpnamePage() {
 
               {items.length > 0 && (
                 <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-                  <button className="btn btn-success" style={{ padding: '1rem 2rem', fontSize: '1.1rem' }} onClick={handleSubmit} disabled={loading}>
+                  <button className="btn btn-success w-full" style={{ padding: '0.85rem 1.5rem', fontSize: '1rem' }} onClick={handleSubmit} disabled={loading}>
                     {loading ? 'Menyimpan...' : '💾 Simpan & Terapkan Stok'}
                   </button>
                 </div>
@@ -492,6 +509,68 @@ export default function OpnamePage() {
             <div className="no-print" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowPrint(false)}>Tutup</button>
               <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Cetak Bukti</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail Stok Opname */}
+      {selectedDetail && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">📋 Detail Stok Opname</h2>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setSelectedDetail(null)}>Tutup</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                <div><strong>ID Dokumen:</strong> OPN-{selectedDetail.id.substring(0,8).toUpperCase()}</div>
+                <div><strong>Tanggal:</strong> {new Date(selectedDetail.createdAt).toLocaleDateString('id-ID')}</div>
+                <div><strong>Petugas:</strong> {selectedDetail.user?.name || '-'}</div>
+              </div>
+
+              <h3 style={{ fontSize: '1rem', margin: '0.5rem 0 0 0' }}>Rincian Barang Disesuaikan:</h3>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Nama Barang</th>
+                      <th style={{ textAlign: 'center' }}>Stok Sistem</th>
+                      <th style={{ textAlign: 'center' }}>Stok Aktual</th>
+                      <th style={{ textAlign: 'center' }}>Selisih</th>
+                      <th>Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedDetail.items?.map((item: any, idx: number) => (
+                      <tr key={idx}>
+                        <td>{idx + 1}</td>
+                        <td style={{ fontWeight: 600 }}>{item.productName || item.product?.name || 'Produk Dihapus'}</td>
+                        <td style={{ textAlign: 'center' }}>{item.systemStock}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.actualStock}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: item.difference < 0 ? '#ef4444' : item.difference > 0 ? '#16a34a' : 'inherit' }}>
+                          {item.difference > 0 ? `+${item.difference}` : item.difference}
+                        </td>
+                        <td>{item.notes || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {selectedDetail.notes && (
+                <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', padding: '0.75rem', borderRadius: '8px' }}>
+                  <strong>Catatan Tambahan:</strong> {selectedDetail.notes}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedDetail(null)}>Tutup</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { handlePrint(selectedDetail); setSelectedDetail(null); }}>
+                  🖨️ Cetak Berita Acara Opname
+                </button>
+              </div>
             </div>
           </div>
         </div>

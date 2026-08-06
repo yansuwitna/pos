@@ -81,7 +81,7 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/products').then(res => res.json()).then(data => { if (data.success) setProducts(data.products); });
+    refreshProducts();
     fetch('/api/customers').then(res => res.json()).then(data => { if (data.success) setCustomers(data.customers); });
     fetch('/api/discount-rules').then(res => res.json()).then(data => { if (data.success) setDiscountRules(data.rules.filter((r: DiscountRule) => r.isActive)); });
     fetch('/api/auth/me').then(res => res.json()).then(data => { if (data.success && data.user) setKasirName(data.user.name); });
@@ -278,6 +278,16 @@ export default function POSPage() {
     setShowConfirmTx(true);
   };
 
+  const refreshProducts = async () => {
+    try {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+      if (data.success) setProducts(data.products);
+    } catch (err) {
+      console.error("Error refreshing products:", err);
+    }
+  };
+
   const executeTransaction = async () => {
     const isCredit = Number(payment) < grandTotal;
     setIsSubmittingTx(true);
@@ -292,6 +302,19 @@ export default function POSPage() {
         setIsSubmittingTx(false);
         return;
       }
+
+      // Immediately deduct stock in local state for zero-latency UI update
+      setProducts(prev => prev.map(p => {
+        const cartItem = cart.find(ci => ci.id === p.id);
+        if (cartItem && p.type !== 'SERVICE') {
+          return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
+        }
+        return p;
+      }));
+
+      // Re-fetch products from server to keep perfectly synchronized
+      refreshProducts();
+
       setReceiptData({ items: [...cart], total, discount: Number(discount || 0), grandTotal, payment: Number(payment), change: Number(payment) - grandTotal, date: new Date() });
       setCart([]); setPayment(''); setDiscount(''); setSelectedCustomer(''); setDueDate('');
       setShowConfirmTx(false);
@@ -390,9 +413,12 @@ export default function POSPage() {
 
         {/* CUSTOMER & DISCOUNTS */}
         <div style={{ background: '#fff', padding: '10px 15px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '10px', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Pelanggan:</div>
-             <SearchableSelect options={customers} value={selectedCustomer} onChange={setSelectedCustomer} placeholder="-- Umum --" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+             <div style={{ fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Pelanggan:</div>
+             <div style={{ flex: 1, display: 'flex', gap: '6px', alignItems: 'center' }}>
+               <SearchableSelect options={customers} value={selectedCustomer} onChange={setSelectedCustomer} placeholder="-- Umum --" />
+               <button onClick={() => setShowAddCustomer(true)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', flexShrink: 0 }} title="Tambah Pelanggan Baru">➕</button>
+             </div>
           </div>
           {(selectedCustomer || (payment !== '' && Number(payment) < grandTotal)) && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff5f5', padding: '6px 10px', borderRadius: '4px', border: '1px solid #fecaca' }}>
@@ -519,6 +545,91 @@ export default function POSPage() {
                 <button style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer', borderRadius: '4px' }} onClick={() => setReceiptData(null)}>Tutup</button>
                 <button id="btn-print-receipt-mobile" style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }} onClick={handlePrint}>Cetak</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL KONFIRMASI PEMBAYARAN MOBILE */}
+        {showConfirmTx && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ width: '100%', maxWidth: '420px', background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', margin: '0 auto 12px auto' }}>🛒</div>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>Konfirmasi Transaksi</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Periksa kembali rincian pembayaran sebelum menyimpan.</p>
+              </div>
+
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', fontSize: '14px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: '#64748b' }}>Total Belanja:</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>Rp {grandTotal.toLocaleString('id-ID')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: '#64748b' }}>Uang Pembayaran:</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>Rp {Number(payment).toLocaleString('id-ID')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '4px', fontWeight: 'bold' }}>
+                  <span style={{ color: Number(payment) < grandTotal ? '#dc2626' : '#16a34a' }}>
+                    {Number(payment) < grandTotal ? 'Sisa Kasbon (Hutang):' : 'Uang Kembalian:'}
+                  </span>
+                  <span style={{ color: Number(payment) < grandTotal ? '#dc2626' : '#16a34a', fontSize: '16px' }}>
+                    Rp {Math.abs(Number(payment) - grandTotal).toLocaleString('id-ID')}
+                  </span>
+                </div>
+
+                {Number(payment) < grandTotal && (
+                  <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #cbd5e1' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#dc2626', marginBottom: '4px' }}>📅 Tanggal Jatuh Tempo Kasbon:</label>
+                    <input 
+                      type="date" 
+                      value={dueDate} 
+                      onChange={e => setDueDate(e.target.value)} 
+                      style={{ width: '100%', padding: '8px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px' }} 
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  disabled={isSubmittingTx}
+                  onClick={() => setShowConfirmTx(false)} 
+                  style={{ flex: 1, padding: '12px', border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}
+                >
+                  Batal
+                </button>
+                <button 
+                  disabled={isSubmittingTx}
+                  onClick={executeTransaction} 
+                  style={{ flex: 1, padding: '12px', border: 'none', background: '#b91c1c', color: '#fff', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  {isSubmittingTx ? 'Memproses...' : 'Ya, Simpan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL TAMBAH PELANGGAN MOBILE */}
+        {showAddCustomer && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '8px', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, fontSize: '18px' }}>➕ Tambah Pelanggan</h2>
+                <button style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }} onClick={() => setShowAddCustomer(false)}>×</button>
+              </div>
+              <form onSubmit={saveNewCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Nama</label>
+                  <input type="text" value={newCustomer.name} onChange={e => setNewCustomer({...newCustomer, name: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} required />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>No HP</label>
+                  <input type="text" value={newCustomer.phone} onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
+                </div>
+                <button type="submit" disabled={savingCustomer} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>{savingCustomer ? 'Menyimpan...' : 'Simpan'}</button>
+              </form>
             </div>
           </div>
         )}

@@ -7,7 +7,7 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 });
     }
-    return NextResponse.json({ success: true, user: session.user });
+    return NextResponse.json({ success: true, user: session.user || session });
   } catch (error) {
     return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });
   }

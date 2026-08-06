@@ -22,6 +22,9 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk menambah pelanggan." }, { status: 403 });
+    }
     const { name, phone, address } = await req.json();
     if (!name) return Response.json({ success: false, message: "Nama pelanggan wajib diisi" }, { status: 400 });
 
@@ -52,6 +55,9 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk mengubah pelanggan." }, { status: 403 });
+    }
     const { id, name, phone, address } = await req.json();
 
     if (!id) {

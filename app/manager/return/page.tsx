@@ -39,12 +39,21 @@ export default function ReturnPage() {
   const [showForm, setShowForm] = useState(false);
   const [editReturnId, setEditReturnId] = useState<string | null>(null);
   const [printData, setPrintData] = useState<any>(null);
+  const [selectedDetail, setSelectedDetail] = useState<any>(null);
   const [tableLoading, setTableLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
     fetchSuppliers();
     fetchHistory();
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(u => {
+        if (u.success) setUserRole(u.role || u.user?.role);
+      })
+      .catch(() => {});
+
     const savedCam = localStorage.getItem('pos_camera_id');
     if (savedCam) setSelectedCamera(savedCam);
     
@@ -172,6 +181,7 @@ export default function ReturnPage() {
   };
 
   const handleEdit = (ret: any) => {
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer hanya memiliki akses lihat data.', 'warning');
     setEditReturnId(ret.id);
     setSelectedSupplier(ret.supplierId || '');
     setReturnDate(new Date(ret.createdAt).toISOString().split('T')[0]);
@@ -191,6 +201,7 @@ export default function ReturnPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer hanya memiliki akses lihat data.', 'warning');
     const result = await Swal.fire({
       title: 'Hapus Retur?',
       text: 'Stok barang akan otomatis dikembalikan (bertambah). Lanjutkan?',
@@ -216,19 +227,9 @@ export default function ReturnPage() {
   };
 
   const submitReturn = async () => {
-    if (cart.length === 0) return Swal.fire('Peringatan', "Belum ada barang.", 'warning');
-    
-    const confirm = await Swal.fire({
-      title: 'Yakin Data Retur Benar?',
-      text: "Stok barang di sistem akan disesuaikan otomatis!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#3b82f6',
-      confirmButtonText: 'Ya, Proses Retur!',
-      cancelButtonText: 'Batal'
-    });
-    if (!confirm.isConfirmed) return;
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer hanya memiliki akses lihat data.', 'warning');
+    if (cart.length === 0) return Swal.fire('Peringatan', "Belum ada barang di daftar retur.", 'warning');
+    if (!returnDate) return Swal.fire('Peringatan', "Tanggal retur harus diisi.", 'warning');
 
     setLoading(true);
     const payload = {
@@ -236,44 +237,35 @@ export default function ReturnPage() {
       notes: notes,
       createdAt: new Date(returnDate).toISOString(),
       items: cart.map(item => ({
-        id: item.product.id,
         productId: item.product.id,
-        name: item.product.name,
         productName: item.product.name,
-        quantity: item.quantity,
+        quantity: Number(item.quantity),
         reason: item.reason
       }))
     };
 
     try {
-      let res;
-      if (editReturnId) {
-        res = await fetch(`/api/returns/${editReturnId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        res = await fetch('/api/returns', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      }
+      const url = editReturnId ? `/api/returns/${editReturnId}` : '/api/returns';
+      const method = editReturnId ? 'PUT' : 'POST';
 
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
       const data = await res.json();
       setLoading(false);
-      
+
       if (data.success) {
-        Swal.fire('Berhasil!', editReturnId ? "Perubahan retur berhasil disimpan." : "Retur berhasil dicatat. Stok berkurang.", 'success');
+        Swal.fire('Berhasil!', editReturnId ? "Data retur berhasil diperbarui." : "Transaksi retur berhasil disimpan.", 'success');
         setCart([]);
         setNotes('');
         setSelectedSupplier('');
         setReturnDate(new Date().toISOString().split('T')[0]);
-        setEditReturnId(null);
         setShowForm(false);
-        fetchProducts(); 
+        setEditReturnId(null);
         fetchHistory();
+        fetchProducts();
       } else {
         Swal.fire('Gagal', data.message, 'error');
       }
@@ -288,7 +280,7 @@ export default function ReturnPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📜 Riwayat Retur Barang</h2>
-          {!showForm && (
+          {!showForm && userRole !== 'ADMIN' && (
             <button className="btn btn-success" onClick={() => {
               setCart([]);
               setSelectedSupplier('');
@@ -324,13 +316,20 @@ export default function ReturnPage() {
                   <td style={{ fontWeight: 600 }}>{h.supplier?.name || '-'}</td>
                   <td>{h.items.length} Macam</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleEdit(h)}>
-                        Edit
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', borderColor: '#0284c7', color: '#0284c7' }} onClick={() => setSelectedDetail(h)}>
+                        👁️ Detail
                       </button>
-                      <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
-                        Hapus
-                      </button>
+                      {userRole !== 'ADMIN' && (
+                        <>
+                          <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleEdit(h)}>
+                            Edit
+                          </button>
+                          <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleDelete(h.id)}>
+                            Hapus
+                          </button>
+                        </>
+                      )}
                       <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => setPrintData(h)}>
                         🖨️ Cetak
                       </button>
@@ -346,18 +345,18 @@ export default function ReturnPage() {
 
       {showForm && (
         <div className="modal-overlay">
-          <div className="modal-content large">
+          <div className="modal-content large" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <h2 className="modal-title">{editReturnId ? '✏️ Edit Retur' : '🔙 Form Input Retur'}</h2>
               <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => { setShowForm(false); setEditReturnId(null); }}>Tutup</button>
             </div>
             
             <div className="modal-body">
-              <p style={{ color: '#991b1b', background: '#fef2f2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.9rem', border: '1px solid #fecaca' }}>
+              <p style={{ color: '#991b1b', background: '#fef2f2', padding: '0.85rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', border: '1px solid #fecaca' }}>
                 ⚠️ Perhatian: Mencatat/mengedit retur di sini akan <strong>MENYESUAIKAN STOK</strong> barang secara otomatis.
               </p>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>Tanggal Retur</label>
                   <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} required />
@@ -379,7 +378,7 @@ export default function ReturnPage() {
                     {scanning ? '❌ Tutup Kamera' : '📷 Buka Kamera Scan Barcode'}
                   </button>
                 ) : (
-                  <div style={{ color: '#166534', background: '#f0fdf4', padding: '1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1.5rem' }}>
+                  <div style={{ color: '#166534', background: '#f0fdf4', padding: '0.85rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, border: '1px solid #bbf7d0', marginBottom: '1rem' }}>
                     🔫 Scanner Alat Aktif! Tembakkan barcode.
                   </div>
                 )}
@@ -396,32 +395,31 @@ export default function ReturnPage() {
                 </div>
               </div>
 
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Diretur:</h3>
+              <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Daftar Barang yang Diretur:</h3>
               
               {cart.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>Daftar retur kosong.</p>
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>Daftar retur kosong.</p>
               ) : (
                 <div>
                   {cart.map((item, idx) => (
-                    <div key={idx} style={{ background: 'var(--bg)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-                      <div style={{ flex: '1 1 200px' }}>
-                        <div style={{ fontWeight: 600 }}>{item.product.name}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Stok sistem saat ini: {item.product.stock}</div>
+                    <div key={idx} style={{ background: 'var(--bg)', padding: '0.85rem', borderRadius: '8px', marginBottom: '0.75rem', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{item.product.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Stok sistem saat ini: {item.product.stock}</div>
+                        </div>
+                        <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.35rem 0.6rem', color: '#ef4444', borderColor: '#ef4444', fontSize: '0.85rem' }} title="Hapus">❌</button>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', flex: '2 1 300px' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Jml (Qty)</label>
-                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1), item.reason)} onFocus={e => e.target.select()} style={{ padding: '0.4rem' }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Jml (Qty)</label>
+                          <input type="number" min="1" value={item.quantity} onChange={e => updateCartItem(item.product.id, e.target.value === '' ? '' : (parseInt(e.target.value) || 1), item.reason)} onFocus={e => e.target.select()} style={{ padding: '0.35rem 0.5rem', width: '100%' }} />
                         </div>
-                        <div style={{ flex: 2 }}>
-                          <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keterangan / Alasan</label>
-                          <input type="text" value={item.reason} onChange={e => updateCartItem(item.product.id, item.quantity, e.target.value)} style={{ padding: '0.4rem' }} placeholder="Rusak, Kemasan Terbuka, dll" />
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Keterangan / Alasan</label>
+                          <input type="text" value={item.reason} onChange={e => updateCartItem(item.product.id, item.quantity, e.target.value)} style={{ padding: '0.35rem 0.5rem', width: '100%' }} placeholder="Rusak, Terbuka, dll" />
                         </div>
-                      </div>
-
-                      <div style={{ flex: '0 0 auto' }}>
-                        <button className="btn btn-outline" onClick={() => removeFromCart(item.product.id)} style={{ padding: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>❌</button>
                       </div>
                     </div>
                   ))}
@@ -507,6 +505,63 @@ export default function ReturnPage() {
             <div className="no-print" style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPrintData(null)}>Tutup</button>
               <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Cetak</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail Retur */}
+      {selectedDetail && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">📤 Detail Retur Barang</h2>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem' }} onClick={() => setSelectedDetail(null)}>Tutup</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                <div><strong>ID Retur:</strong> RET-{selectedDetail.id.slice(-8).toUpperCase()}</div>
+                <div><strong>Tanggal:</strong> {new Date(selectedDetail.createdAt).toLocaleDateString('id-ID')}</div>
+                <div><strong>Supplier (Tujuan):</strong> {selectedDetail.supplier?.name || '-'}</div>
+                <div><strong>Petugas:</strong> {selectedDetail.user?.name || '-'}</div>
+              </div>
+
+              <h3 style={{ fontSize: '1rem', margin: '0.5rem 0 0 0' }}>Daftar Barang Diretur:</h3>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Nama Barang</th>
+                      <th style={{ textAlign: 'center' }}>Qty</th>
+                      <th>Alasan / Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedDetail.items?.map((item: any, idx: number) => (
+                      <tr key={idx}>
+                        <td>{idx + 1}</td>
+                        <td style={{ fontWeight: 600 }}>{item.productName || item.product?.name || 'Produk Dihapus'}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+                        <td>{item.reason || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {selectedDetail.notes && (
+                <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', padding: '0.75rem', borderRadius: '8px' }}>
+                  <strong>Catatan Tambahan:</strong> {selectedDetail.notes}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSelectedDetail(null)}>Tutup</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => { setPrintData(selectedDetail); setSelectedDetail(null); }}>
+                  🖨️ Cetak Surat Jalan Retur
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -67,6 +67,20 @@ export default function LayoutWrapper({ role, name, storeName: initialStoreName,
             </a>
           ))}
         </nav>
+
+        <div className="sidebar-footer">
+          {storeInfo?.name && (
+            <div className="sidebar-store-name">
+              <span>🏪</span>
+              <span>{storeInfo.name}</span>
+            </div>
+          )}
+          <div className="sidebar-user-info">
+            <span className="nav-role-badge">{roleLabels[role] ?? role}</span>
+            <span className="sidebar-username">{name}</span>
+          </div>
+          <a href="/api/auth/logout" className="nav-btn-logout sidebar-logout">🚪 Keluar</a>
+        </div>
       </aside>
 
       {/* Main Wrapper */}
@@ -90,21 +104,9 @@ export default function LayoutWrapper({ role, name, storeName: initialStoreName,
                 <div 
                   className="nav-store-badge" 
                   title={`Toko: ${storeInfo.name}`}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    background: 'rgba(239, 68, 68, 0.1)', 
-                    color: '#ef4444', 
-                    border: '1px solid rgba(239, 68, 68, 0.25)', 
-                    padding: '4px 10px', 
-                    borderRadius: '20px', 
-                    fontSize: '0.85rem', 
-                    fontWeight: 'bold' 
-                  }}
                 >
                   <span>🏪</span>
-                  <span>{storeInfo.name}</span>
+                  <span className="nav-store-badge-text">{storeInfo.name}</span>
                 </div>
               )}
 

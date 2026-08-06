@@ -19,9 +19,21 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [tableLoading, setTableLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
     fetchCustomers();
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        const u = data.user || data;
+        if (data.success && u) {
+          setUserRole(u.role || u.user?.role);
+        }
+      })
+      .catch(err => console.error(err))
+      .finally(() => setRoleLoading(false));
   }, []);
 
   const fetchCustomers = async () => {
@@ -37,6 +49,7 @@ export default function CustomersPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editCustomer) {
+      if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer tidak diperbolehkan mengedit pelanggan.', 'warning');
       if (!editCustomer.name) return Swal.fire('Peringatan', "Nama Pelanggan wajib diisi", 'warning');
       setLoading(true);
       try {
@@ -60,6 +73,7 @@ export default function CustomersPage() {
         setLoading(false);
       }
     } else {
+      if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer tidak diperbolehkan menambah pelanggan.', 'warning');
       if (!form.name) return Swal.fire('Peringatan', "Nama Pelanggan wajib diisi", 'warning');
       setLoading(true);
       try {
@@ -86,6 +100,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (userRole === 'ADMIN') return Swal.fire('Akses Ditolak', 'Manajer tidak diperbolehkan menghapus pelanggan.', 'warning');
     const result = await Swal.fire({
       title: 'Hapus Pelanggan?',
       text: `Anda yakin ingin menghapus pelanggan "${name}"?`,
@@ -120,7 +135,7 @@ export default function CustomersPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="card-title" style={{ marginBottom: 0 }}>📋 Daftar Pelanggan ({customers.length})</h2>
-          {!showForm && (
+          {!showForm && !roleLoading && userRole !== 'ADMIN' && (
             <button className="btn btn-success" onClick={() => setShowForm(true)}>➕ Tambah Pelanggan</button>
           )}
         </div>
@@ -131,13 +146,13 @@ export default function CustomersPage() {
                 <th>Nama</th>
                 <th>Kontak (No HP)</th>
                 <th>Alamat</th>
-                <th>Aksi</th>
+                {userRole !== 'ADMIN' && <th>Aksi</th>}
               </tr>
             </thead>
             <tbody>
               {tableLoading ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={userRole === 'ADMIN' ? 3 : 4} style={{ textAlign: 'center', padding: '2rem' }}>
                     <div className="spinner"></div> Memuat data...
                   </td>
                 </tr>
@@ -148,24 +163,26 @@ export default function CustomersPage() {
                     <td style={{ fontWeight: 600 }}>{c.name}</td>
                     <td>{c.phone || '-'}</td>
                     <td>{c.address || '-'}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => {
-                            setEditCustomer(c);
-                            setShowForm(true);
-                          }}
-                          style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0.3rem 0.7rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
-                        >Edit</button>
-                        {!isUsed && (
-                          <button 
-                            onClick={() => handleDelete(c.id, c.name)} 
-                            style={{ background: 'none', border: '1px solid #ef4444', color: '#ef4444', padding: '0.3rem 0.7rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
-                            Hapus
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    {userRole !== 'ADMIN' && (
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => {
+                              setEditCustomer(c);
+                              setShowForm(true);
+                            }}
+                            style={{ background: 'none', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0.3rem 0.7rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                          >Edit</button>
+                          {!isUsed && (
+                            <button 
+                              onClick={() => handleDelete(c.id, c.name)} 
+                              style={{ background: 'none', border: '1px solid #ef4444', color: '#ef4444', padding: '0.3rem 0.7rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

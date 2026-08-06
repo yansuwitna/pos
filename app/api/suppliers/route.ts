@@ -31,6 +31,9 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk menambah supplier." }, { status: 403 });
+    }
     const data = await req.json();
 
     let storeId = session?.storeId as string | undefined;
@@ -65,6 +68,9 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk mengubah supplier." }, { status: 403 });
+    }
     const { id, name, contact, address } = await req.json();
 
     if (!id) {
@@ -97,6 +103,10 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk menghapus supplier." }, { status: 403 });
+    }
     const { id } = await req.json();
     await prisma.supplier.delete({ where: { id } });
     return Response.json({ success: true });

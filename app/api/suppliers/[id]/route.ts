@@ -7,6 +7,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (!session) {
       return Response.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
+    if (session.role === 'ADMIN') {
+      return Response.json({ success: false, message: 'Manajer tidak memiliki izin untuk mengubah supplier.' }, { status: 403 });
+    }
 
     const { name, contact, address } = await req.json();
 

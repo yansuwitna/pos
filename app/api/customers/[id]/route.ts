@@ -3,6 +3,10 @@ import { getSession } from '@/lib/auth';
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
+    const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk mengubah pelanggan." }, { status: 403 });
+    }
     const { name, phone, address } = await req.json();
     if (!name) return Response.json({ success: false, message: "Nama pelanggan wajib diisi" }, { status: 400 });
 
@@ -18,6 +22,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
+    const session = await getSession();
+    if (session?.role === 'ADMIN') {
+      return Response.json({ success: false, message: "Manajer tidak memiliki izin untuk menghapus pelanggan." }, { status: 403 });
+    }
     await prisma.customer.delete({
       where: { id: params.id }
     });
